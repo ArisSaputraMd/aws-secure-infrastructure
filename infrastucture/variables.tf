@@ -31,6 +31,29 @@ variable "vpc_cidr" {
 
 
 # =============================================
+# Database
+# =============================================
+variable "db_name" {
+  description = "Name of the Mattermost database"
+  type        = string
+  default     = "mattermost"
+}
+
+variable "db_username" {
+  description = "Master username for RDS"
+  type        = string
+  default     = "mattermost"
+}
+
+variable "db_password" {
+  description = "Master password for RDS"
+  type        = string
+  sensitive   = true
+}
+
+
+
+# =============================================
 # Tags
 # =============================================
 variable "project_name" {
