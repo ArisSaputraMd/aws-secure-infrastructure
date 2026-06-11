@@ -36,6 +36,15 @@ variable "vpc_cidr" {
   default     = "10.0.0.0/16"
 }
 
+# =============================================
+# ECS
+# =============================================
+variable "ecs_cluster_name" {
+  description = "Name of the ECS cluster"
+  type        = string
+  default     = "mattermost-cluster"
+}
+
 
 # =============================================
 # Database
