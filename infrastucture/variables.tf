@@ -13,6 +13,13 @@ variable "aws_profile" {
   default     = "default"
 }
 
+# =============================================
+# DNS
+# =============================================
+variable "domain_name" {
+  description = "Root domain name for the project"
+  type        = string
+}
 
 # =============================================
 # Networking
