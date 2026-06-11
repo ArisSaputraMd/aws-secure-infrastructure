@@ -22,16 +22,15 @@ _Diagram will be added here when Phase 1 is complete._
 
 ## Tech Stack
 
-| Service         | Purpose                         | Why this over the alternative                                                                                                                        |
-| --------------- | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Terraform       | Infrastructure as Code          | Reproducible, version-controlled infrastructure; destroy and redeploy in minutes                                                                     |
-| ECS Fargate     | Run Mattermost container        | No cluster management vs EKS; cheaper and simpler for single-app deployment                                                                          |
-| RDS PostgreSQL  | Back-end Datastore              | Configured for relational data storage with encrypted storage-at-rest. Free-tier compliant for staging.; Aurora Serverless costs ~$0.06/hr even idle |
-| ALB             | Load balancer + TLS termination | Integrates natively with ACM and ECS; handles HTTPS offloading                                                                                       |
-| ACM             | TLS certificate                 | Free, auto-renews, integrates with ALB and CloudFront                                                                                                |
-| CloudFront + S3 | CDN + static/error pages        | Reduces origin load; serves custom error pages without hitting ECS                                                                                   |
-| Route 53        | DNS management                  | Native AWS integration with ALB and CloudFront; supports health checks                                                                               |
-| VPC Endpoints   | Private AWS service access      | Eliminates NAT Gateway cost for ECR, S3, and CloudWatch Logs (~$0.15–0.30/session saved)                                                             |
+| Service        | Purpose                         | Why this over the alternative                                                                                                                        |
+| -------------- | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Terraform      | Infrastructure as Code          | Reproducible, version-controlled infrastructure; destroy and redeploy in minutes                                                                     |
+| ECS Fargate    | Run Mattermost container        | No cluster management vs EKS; cheaper and simpler for single-app deployment                                                                          |
+| RDS PostgreSQL | Back-end Datastore              | Configured for relational data storage with encrypted storage-at-rest. Free-tier compliant for staging.; Aurora Serverless costs ~$0.06/hr even idle |
+| ALB            | Load balancer + TLS termination | Integrates natively with ACM and ECS; handles HTTPS offloading                                                                                       |
+| ACM            | TLS certificate                 | Free, auto-renews, integrates with ALB and CloudFront                                                                                                |
+| Route 53       | DNS management                  | Native AWS integration with ALB and CloudFront; supports health checks                                                                               |
+| VPC Endpoints  | Private AWS service access      | Eliminates NAT Gateway cost for ECR, S3, and CloudWatch Logs (~$0.15–0.30/session saved)                                                             |
 
 ---
 
@@ -40,7 +39,7 @@ _Diagram will be added here when Phase 1 is complete._
 - **ECS Fargate over EKS** — Kubernetes adds operational overhead that is not justified for a single application. Fargate removes server management entirely.
 - **RDS PostgreSQL over Aurora Serverless v2** — Aurora is not free tier eligible and costs money even when idle. RDS t3.micro is free for 12 months.
 - **VPC Endpoints over NAT Gateway** — NAT Gateway costs ~$0.045/hr plus data transfer fees. VPC Endpoints for ECR, S3, and CloudWatch Logs eliminate this cost for private subnet resources.
-- **Single-AZ RDS for Phase 1** — Multi-AZ doubles RDS cost with no benefit in a lab environment.
+- **Single-AZ RDS for Phase 1** — Production-inspired cloud architecture designed with security, scalability, and operational best practices. Development deployments run in a cost-optimized Single-AZ configuration, while the Terraform code supports promotion to Multi-AZ production deployments through environment variables..
 - **ACM over self-signed certificates** — Free, trusted by all browsers, auto-renews, zero operational overhead.
 - **Parameterized Multi-Environment Code**: The entire codebase utilizes highly structured Terraform variables (variables.tf). While active development runs on a single Availability Zone utilizing db.t3.micro to stay inside the AWS Free Tier, flipping the environment variable to "prod" instantly scales the infrastructure to a Multi-AZ, high-availability cluster.
 
@@ -61,10 +60,6 @@ _To be completed when Phase 1 Terraform is deployed._
 _To be completed when Phase 1 Terraform is deployed._
 
 ### Load Balancer + TLS (ALB + ACM)
-
-_To be completed when Phase 1 Terraform is deployed._
-
-### CDN + Static Files (CloudFront + S3)
 
 _To be completed when Phase 1 Terraform is deployed._
 
@@ -96,8 +91,6 @@ aws-secure-infrastructure/
    ├── ecs.tf
    ├── rds.tf
    ├── acm.tf
-   ├── cloudfront.tf
-   ├── s3.tf
    └── dns.tf
 
 ```
@@ -154,20 +147,19 @@ $ terraform destroy -auto-approve
 
 To demonstrate production feasibility while keeping development overhead zero, the lifecycle cost of running a single validation session is broken down below:
 
-| Resource Type | AWS Component             | Cost per 4-Hour Dev Session  | Live Production Cost (Monthly Scale) |
-| ------------- | ------------------------- | ---------------------------- | ------------------------------------ |
-| Database      | RDS db.t3.micro           | $0.00 (Free Tier)            | ~$34.00 (Multi-AZ Production)        |
-| Compute       | ECS Fargate Tasks         | ~$0.04                       | ~$22.00 (2x Tasks Scaled)            |
-| Networking    | Application Load Balancer | ~$0.09                       | ~$16.24                              |
-| Endpoints     | Interface VPC Endpoints   | ~$0.04                       | ~$21.60                              |
-| Edge Cache    | CloudFront & S3           | $0.00 (Free Tier Allocation) | Variable by Traffic Volume           |
-|               |                           | Total Session Cost~$0.17     | Ready for Enterprise Pivot           |
+| Resource Type | AWS Component             | Cost per 4-Hour Dev Session | Live Production Cost (Monthly Scale) |
+| ------------- | ------------------------- | --------------------------- | ------------------------------------ |
+| Database      | RDS db.t3.micro           | $0.00 (Free Tier)           | ~$34.00 (Multi-AZ Production)        |
+| Compute       | ECS Fargate Tasks         | ~$0.04                      | ~$22.00 (2x Tasks Scaled)            |
+| Networking    | Application Load Balancer | ~$0.09                      | ~$16.24                              |
+| Endpoints     | Interface VPC Endpoints   | ~$0.04                      | ~$21.60                              |
+|               |                           | Total Session Cost~$0.17    | Ready for Enterprise Pivot           |
 
 ---
 
 ## Roadmap
 
-- [ ] **Phase 1 — Core Infrastructure** — VPC, ECS Fargate, RDS, ALB, CloudFront, Route 53, Terraform
+- [ ] **Phase 1 — Core Infrastructure** — VPC, ECS Fargate, RDS, ALB, Route 53, Terraform
 - [ ] **Phase 2 — Observability & Threat Detection** — CloudWatch dashboards, WAF, GuardDuty, VPC Flow Logs, CloudTrail
 - [ ] **Phase 3 — Incident Response Runbooks** — 3 documented security scenarios investigated using Phase 2 tooling
 - [ ] **Phase 4 — Security Automation** — GuardDuty → EventBridge → Lambda auto-remediation
