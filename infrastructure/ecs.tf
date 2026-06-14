@@ -1,7 +1,6 @@
 # =============================================
 # ecs.tf
 # =============================================
-
 # CloudWatch Log Group — stores Mattermost container logs
 resource "aws_cloudwatch_log_group" "ecs" {
   name              = "/ecs/${var.project_name}-${var.environment}"
@@ -49,11 +48,14 @@ resource "aws_ecs_task_definition" "mattermost" {
         }
       ]
 
-      environment = [
+      secrets = [
         {
-          name  = "MM_SQLSETTINGS_DATASOURCE"
-          value = "postgres://${var.db_username}:${var.db_password}@${aws_db_instance.primary.address}:5432/${var.db_name}?sslmode=disable"
-        },
+          name      = "MM_SQLSETTINGS_DATASOURCE"
+          valueFrom = aws_ssm_parameter.db_dsn.arn
+        }
+      ]
+
+      environment = [
         {
           name  = "MM_SERVICESETTINGS_SITEURL"
           value = "https://${var.domain_name}"

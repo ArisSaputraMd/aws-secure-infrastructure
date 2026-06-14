@@ -25,7 +25,7 @@ resource "aws_db_instance" "primary" {
 
   db_name  = var.db_name
   username = var.db_username
-  password = var.db_password
+  password = data.aws_ssm_parameter.db_password.value
   port     = 5432
 
   db_subnet_group_name   = aws_db_subnet_group.primary.name
