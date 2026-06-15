@@ -3,9 +3,9 @@
 # =============================================
 
 # A record — root domain points to ALB
-resource "aws_route53_record" "root" {
+resource "aws_route53_record" "mattermost" {
   zone_id = data.aws_route53_zone.main.zone_id
-  name    = var.domain_name
+  name    = "${var.app_subdomain}.${var.domain_name}"
   type    = "A"
 
   alias {
@@ -18,7 +18,7 @@ resource "aws_route53_record" "root" {
 # A record — www subdomain points to same ALB
 resource "aws_route53_record" "www" {
   zone_id = data.aws_route53_zone.main.zone_id
-  name    = "www.${var.domain_name}"
+  name    = "www.${var.app_subdomain}.${var.domain_name}"
   type    = "A"
 
   alias {

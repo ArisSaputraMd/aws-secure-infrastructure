@@ -21,6 +21,9 @@ variable "domain_name" {
   type        = string
 }
 
+variable "app_subdomain" {
+  default = "mattermost"
+}
 # =============================================
 # Networking
 # =============================================

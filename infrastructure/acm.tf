@@ -4,7 +4,7 @@
 
 # ACM Certificate — creates a certificate for the ALB and validates it via DNS
 resource "aws_acm_certificate" "main" {
-  domain_name       = var.domain_name
+  domain_name       = "*.${var.domain_name}"
   validation_method = "DNS"
 
   lifecycle {
