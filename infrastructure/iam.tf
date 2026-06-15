@@ -24,7 +24,7 @@ data "aws_iam_policy_document" "ecs_task_ssm_policy" {
     effect  = "Allow"
     actions = ["ssm:GetParameters"]
     resources = [
-      "arn:aws:ssm:${var.aws_region}:${data.aws_caller_identity.current.account_id}:parameter/${var.project_name}-${var.environment}-*"
+      "arn:aws:ssm:${var.aws_region}:${data.aws_caller_identity.current.account_id}:parameter/${var.environment}/${var.project_name}/*"
     ]
   }
 }
