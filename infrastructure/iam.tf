@@ -42,10 +42,18 @@ resource "aws_iam_role" "ecs_task_execution_role" {
   }
 }
 
+resource "aws_iam_role_policy" "ecs_task_execution_ssm_policy" {
+  name   = "${var.project_name}-${var.environment}-ssm-read-policy"
+  role   = aws_iam_role.ecs_task_execution_role.id
+  policy = data.aws_iam_policy_document.ecs_task_ssm_policy.json
+}
+
 resource "aws_iam_role_policy_attachment" "ecs_task_execution_role_policy" {
   role       = aws_iam_role.ecs_task_execution_role.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
+
+
 
 # ECS Task Role
 # Used by the container itself at runtime: read DB password from SSM

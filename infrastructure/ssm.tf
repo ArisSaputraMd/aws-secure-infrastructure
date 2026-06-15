@@ -4,7 +4,7 @@ data "aws_ssm_parameter" "db_password" {
 }
 
 locals {
-  db_dsn = "postgres://${var.db_username}:${data.aws_ssm_parameter.db_password.value}@${aws_db_instance.primary.address}:5432/${var.db_name}?sslmode=require"
+  db_dsn = "postgres://${var.db_username}:${urlencode(data.aws_ssm_parameter.db_password.value)}@${aws_db_instance.primary.address}:5432/${var.db_name}?sslmode=require"
 }
 
 resource "aws_ssm_parameter" "db_dsn" {
