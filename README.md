@@ -1,177 +1,293 @@
 # AWS Secure Infrastructure
 
-A production-grade, highly available, and enterprise-hardened cloud architecture deployed on AWS using Terraform. This repository hosts a zero-trust network infrastructure designed to host containerized mission-critical applications (using a Mattermost Enterprise Collaboration container as the primary validation stack) while maintaining an rigorous security posture and a cost-optimized footprint (FinOps).
+A production-like AWS deployment of Mattermost on ECS Fargate, built with Terraform and native AWS tooling. This is my primary portfolio project for transitioning into cloud support / junior cloud-DevOps roles, with cloud security as the long-term goal.
 
-This repository serves as a multi-phase cloud security portfolio:
+**What this demonstrates:** a private-subnet-only compute and data tier with no direct internet exposure, NAT-free networking via VPC endpoints (cost-optimized without sacrificing isolation), and secrets injected into the container at runtime rather than baked into images or stored as plaintext environment variables.
 
-- Phase 1: Secure Core Infrastructure & Network Topology (`Current`).
+The project is split into three phases:
 
-- Phase 2: Observability, SIEM Integration & Threat Detection (`In Progress`).
+- **Phase 1 — Core Infrastructure** (`Built — docs in progress`)
+- **Phase 2 — AWS Well-Architected 6 Pillars** (`Planned`)
+- **Phase 3 — Infrastructure Automation** (`Planned`)
 
-- Phase 3: Incident Response Playbooks & Threat Hunting (`Planned`).
-
-- Phase 4: Automated Security Remediation via AWS Lambda (`Planned`).
+**Status:** Phase 1 of 3 complete (infrastructure built, docs in progress) | `dev` environment | deploy-and-destroy lab model
 
 ---
 
 ## Architecture Diagram
 
-_Diagram will be added here when Phase 1 is complete._
+![architecture diagram](assets/architecture-diagram.png)
 
 ---
 
-## Tech Stack
+## Infrastructure Overview
 
-| Service        | Purpose                         | Why this over the alternative                                                                                                                        |
-| -------------- | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Terraform      | Infrastructure as Code          | Reproducible, version-controlled infrastructure; destroy and redeploy in minutes                                                                     |
-| ECS Fargate    | Run Mattermost container        | No cluster management vs EKS; cheaper and simpler for single-app deployment                                                                          |
-| RDS PostgreSQL | Back-end Datastore              | Configured for relational data storage with encrypted storage-at-rest. Free-tier compliant for staging.; Aurora Serverless costs ~$0.06/hr even idle |
-| ALB            | Load balancer + TLS termination | Integrates natively with ACM and ECS; handles HTTPS offloading                                                                                       |
-| ACM            | TLS certificate                 | Free, auto-renews, integrates with ALB and CloudFront                                                                                                |
-| Route 53       | DNS management                  | Native AWS integration with ALB and CloudFront; supports health checks                                                                               |
-| VPC Endpoints  | Private AWS service access      | Eliminates NAT Gateway cost for ECR, S3, and CloudWatch Logs (~$0.15–0.30/session saved)                                                             |
+Built using modular, reusable Terraform so the same code can deploy multiple environments without rewriting it, while keeping infrastructure, tagging, and configuration consistent.
 
----
+### 1. Networking
 
-## Key Technical & FinOps Decisions
+**VPC**
 
-- **ECS Fargate over EKS** — Kubernetes adds operational overhead that is not justified for a single application. Fargate removes server management entirely.
-- **RDS PostgreSQL over Aurora Serverless v2** — Aurora is not free tier eligible and costs money even when idle. RDS t3.micro is free for 12 months.
-- **VPC Endpoints over NAT Gateway** — NAT Gateway costs ~$0.045/hr plus data transfer fees. VPC Endpoints for ECR, S3, and CloudWatch Logs eliminate this cost for private subnet resources.
-- **Single-AZ RDS for Phase 1** — Production-inspired cloud architecture designed with security, scalability, and operational best practices. Development deployments run in a cost-optimized Single-AZ configuration, while the Terraform code supports promotion to Multi-AZ production deployments through environment variables..
-- **ACM over self-signed certificates** — Free, trusted by all browsers, auto-renews, zero operational overhead.
-- **Parameterized Multi-Environment Code**: The entire codebase utilizes highly structured Terraform variables (variables.tf). While active development runs on a single Availability Zone utilizing db.t3.micro to stay inside the AWS Free Tier, flipping the environment variable to "prod" instantly scales the infrastructure to a Multi-AZ, high-availability cluster.
+- IPv4 CIDR block: `10.0.0.0/16` (default)
+- Region: Asia Pacific — Jakarta (default)
+- Availability Zones: 2 AZs, dynamically selected via `slice()` based on the region's available AZs
+- Internet Gateway attached
+- DNS hostnames and DNS support enabled
+- Tagged by environment and project name
 
----
+**Subnet layout & tiering**
 
-## Infrastructure Breakdown
+The VPC is segmented into a 3-tier subnet design across 2 AZs:
 
-### Networking
+- Public subnets — internet-facing (ALB only)
+- Private subnets — application layer (ECS Fargate)
+- Private subnets — database layer (RDS)
 
-_To be completed when Phase 1 Terraform is deployed._
+Each subnet's CIDR block is generated automatically from the VPC CIDR using `cidrsubnet()`.
 
-### Compute (ECS Fargate)
+**VPC Endpoints**
 
-_To be completed when Phase 1 Terraform is deployed._
+Instead of a NAT Gateway, VPC Interface Endpoints handle private connectivity for ECR, S3, SSM, and CloudWatch Logs.
 
-### Database (RDS PostgreSQL)
+**Routing & traffic flow**
 
-_To be completed when Phase 1 Terraform is deployed._
+Public subnets route to the Internet Gateway. Private subnets have no direct internet route — outbound traffic to AWS services goes through VPC Endpoints instead.
 
-### Load Balancer + TLS (ALB + ACM)
+**Security groups — network segmentation**
 
-_To be completed when Phase 1 Terraform is deployed._
+| Name               | Inbound                           | Outbound    |
+| ------------------ | --------------------------------- | ----------- |
+| `alb-sg`           | `0.0.0.0/0` on HTTP/80, HTTPS/443 | `0.0.0.0/0` |
+| `ecs-sg`           | `alb-sg` on TCP/8065              | `0.0.0.0/0` |
+| `rds-sg`           | `ecs-sg` on TCP/5432              | `0.0.0.0/0` |
+| `vpc-endpoints-sg` | `10.0.0.0/16` on HTTPS/443        | `0.0.0.0/0` |
 
-### DNS (Route 53)
+![VPC resource map console](assets/vpc-resource-map.png)
+_Figure 1: Console view of VPC resource map_
 
-_To be completed when Phase 1 Terraform is deployed._
+### 2. Route 53
+
+DNS management for the application domain via a hosted zone, which holds records for:
+
+- TLS certificate validation
+- Application domain and subdomains
+- Alias record pointing to the ALB
+
+![mattermost.aris-saputra.dev screenshot](assets/mattermost.aris-saputra.dev-website.png)
+_Figure 2: mattermost.aris-saputra.dev_
+
+### 3. Application Load Balancer + TLS (ALB + ACM)
+
+The ALB is deployed in the public subnets and integrated with an ACM certificate for TLS termination.
+
+- HTTP/80 listener redirects to HTTPS/443; HTTPS/443 listener forwards to the target group.
+- Target group points to the ECS service on port 8065, with health checks over HTTP against `/api/v4/system/ping`.
+
+### 4. Compute (ECS Fargate)
+
+The application runs as a Docker container in an ECS cluster using the Fargate launch type. Tasks run in private subnets with no public IP, and the security group only allows inbound traffic from `alb-sg` on port 8065.
+
+Task definition configuration:
+
+- `network_mode = "awsvpc"`
+- `cpu = "256"`, `memory = "512"`
+- Execution role policy: `sts:AssumeRole`, `ssm:GetParameters`, `AmazonECSTaskExecutionRolePolicy`
+- Task role policy: `sts:AssumeRole`, `ssm:GetParameters`
+- Container definition (via `jsonencode`): pulls the image from ECR and ships logs to CloudWatch, both over VPC Endpoints
+
+![ECS task console](assets/ecs-task-conssole.png)
+_Figure 3: ECS task running_
+
+### 5. Database (RDS PostgreSQL)
+
+RDS is deployed in the database-tier private subnets, with a security group that only allows traffic from `ecs-sg` on port 5432.
+
+Configuration:
+
+- PostgreSQL 16.9
+- `t3.micro` instance class
+- 20 GB `gp2` allocated storage
+- Credentials via SSM (not stored in Terraform)
+- Single-AZ
+- Storage encryption enabled
+
+### 6. Secrets Handling
+
+Database credentials are managed via SSM Parameter Store, not Terraform variables:
+
+- The DB password is stored manually as a `SecureString` in SSM at `/${var.environment}/${var.project_name}/database/mattermost/password`.
+- A `locals` block in `ssm.tf` constructs the full Postgres DSN (with `sslmode=require`) and writes it to a second SSM parameter: `/${var.environment}/${var.project_name}/database/mattermost/db_dsn`.
+- The ECS task definition references the DSN parameter ARN via the `secrets` block (`valueFrom`), so it's injected at container start rather than stored in plaintext environment variables.
+- `MM_SERVICESETTINGS_SITEURL` stays in the `environment` block since it's non-sensitive.
+- The ECS task execution role has `ssm:GetParameters` scoped to the DSN parameter ARN.
+
+**Known limitation:** because Terraform writes the DSN to SSM, it also ends up in `.tfstate` in plaintext. For a local-state lab setup that's an accepted tradeoff, but it's called out here rather than glossed over. A real production setup would need a remote backend with encryption and tightly scoped access controls — or a different approach that avoids passing the DSN through Terraform entirely (e.g. constructing it at runtime inside the container, or using Secrets Manager's dynamic reference syntax).
 
 ---
 
 ## Infrastructure Code Layout
 
-The project follows standard HashiCorp structural conventions to maintain modularity and visibility for technical review:
-
 ```
 aws-secure-infrastructure/
 ├── README.md
 ├── .gitignore
-├── terraform/
-   ├── main.tf
-   ├── providers.tf
-   ├── versions.tf
-   ├── variables.tf
-   ├── terraform.tfvars.example
-   ├── outputs.tf
-   ├── networking.tf
-   ├── security.tf
-   ├── iam.tf
-   ├── alb.tf
-   ├── ecs.tf
-   ├── rds.tf
-   ├── acm.tf
-   └── dns.tf
-
+├── assets/
+├── infrastructure/
+│   ├── providers.tf
+│   ├── versions.tf
+│   ├── variables.tf
+│   ├── terraform.tfvars.example
+│   ├── outputs.tf
+│   ├── networking.tf
+│   ├── security.tf
+│   ├── iam.tf
+│   ├── alb.tf
+│   ├── ecs.tf
+│   ├── ssm.tf
+│   ├── rds.tf
+│   ├── acm.tf
+│   └── dns.tf
 ```
 
 ---
 
-## How to Safely Deploy (FinOps Lifecycle)
+## Tech Stack
 
-This project utilizes a State Cycle Strategy to develop enterprise infrastructure without generating running idle costs. To deploy the stack locally:
+| Service                     | Purpose                          | Why this over the alternative                                                                |
+| --------------------------- | -------------------------------- | -------------------------------------------------------------------------------------------- |
+| Terraform                   | Infrastructure as Code           | Reproducible, version-controlled infrastructure; destroy and redeploy in minutes             |
+| ECS Fargate                 | Run the Mattermost container     | No cluster management vs. EKS; cheaper and simpler for a single-app deployment               |
+| RDS PostgreSQL (`t3.micro`) | Backend datastore                | Free-tier eligible; Aurora Serverless v2 is not                                              |
+| ALB                         | Load balancing + TLS termination | Native integration with ACM and ECS                                                          |
+| ACM                         | TLS certificate                  | Free, auto-renewing, integrates directly with ALB                                            |
+| Route 53                    | DNS management                   | Native integration with ALB; handles domain delegation                                       |
+| SSM Parameter Store         | Secrets management               | `SecureString` is free on the standard tier; planned migration to Secrets Manager in Phase 2 |
+| VPC Interface Endpoints     | Private AWS service access       | Removes NAT Gateway cost (~$32/month) for ECR, S3, SSM, CloudWatch Logs                      |
+
+---
+
+## Key Technical & FinOps Decisions
+
+- **ECS Fargate over EKS** — Kubernetes is overkill for running a single app at this stage; not worth the added operational complexity.
+- **RDS over Aurora Serverless v2** — Aurora Serverless v2 isn't free-tier eligible. RDS `t3.micro` is.
+- **VPC Interface Endpoints over a NAT Gateway** — a NAT Gateway runs ~$32/month minimum, which doesn't make sense for a lab setup. Endpoints cover ECR, S3, SSM, and CloudWatch Logs for less. Tradeoff: anything needing general internet access from private subnets (e.g. pulling images straight from Docker Hub) won't work — addressed by routing all image pulls through ECR.
+- **Modular Terraform files over one monolithic file** — easier to navigate and mirrors how the actual infrastructure is organized.
+- **Single-AZ RDS for Phase 1** — Multi-AZ doubles RDS cost with no real benefit in a lab environment.
+- **Native AWS tools only** — Phase 2 (Well-Architected pillars) uses GuardDuty, Security Hub, Config, CloudWatch, Backup, IAM Access Analyzer, and similar. No third-party agents or SIEMs (e.g. Wazuh).
+- **Deploy and destroy** — the stack is spun up only while actively in use and torn down afterward to avoid idle cost.
+
+---
+
+## How to Deploy
 
 ### 1. Prerequisites
 
-- `AWS CLI` installed and authenticated (`aws configure`).
-- `tfenv` installed via Homebrew
-  ```
-  $ brew install tfenv
-  $ tfenv install 1.15.5
-  $ tfenv use 1.15.5
-  ```
+AWS CLI installed and authenticated (`aws configure`). `tfenv` installed:
 
-### 2. Execution Setup
-
-- Clone the repository and initialize the project:
-  ```
-  $ git clone https://github.com/ArisSaputraMd/aws-secure-infrastructure.git
-  $ cd aws-secure-infrastructure
-  ```
-- Create your localized configuration variables file by copying the example template:
-  ```
-  $ cp terraform.tfvars.example terraform.tfvars
-  ```
-  _Modify `terraform.tfvars` with your specific local parameters (this file is automatically blocked by `.gitignore`)._
-
-### 3. Apply the Infrastructure
-
-- Initialize the working directory and execute the plan:
-  ```
-  $ terraform init
-  $ terraform plan -out=tfplan
-  $ terraform apply tfplan
-  ```
-
-### 4. Tear-Down (Cost Mitigation Routine)
-
-When testing or code reviews are complete, completely purge the running resources to bring the billing rate back to zero:
-
-```
-$ terraform destroy -auto-approve
+```bash
+brew install tfenv
+tfenv install 1.15.5
+tfenv use 1.15.5
 ```
 
----
+### 2. Setup
 
-## Infrastructure Cost Analysis
+```bash
+git clone https://github.com/ArisSaputraMd/aws-secure-infrastructure.git
+cd aws-secure-infrastructure/infrastructure
+cp terraform.tfvars.example terraform.tfvars
+```
 
-To demonstrate production feasibility while keeping development overhead zero, the lifecycle cost of running a single validation session is broken down below:
+Edit `terraform.tfvars` with your local parameters (this file is gitignored).
 
-| Resource Type | AWS Component             | Cost per 4-Hour Dev Session | Live Production Cost (Monthly Scale) |
-| ------------- | ------------------------- | --------------------------- | ------------------------------------ |
-| Database      | RDS db.t3.micro           | $0.00 (Free Tier)           | ~$34.00 (Multi-AZ Production)        |
-| Compute       | ECS Fargate Tasks         | ~$0.04                      | ~$22.00 (2x Tasks Scaled)            |
-| Networking    | Application Load Balancer | ~$0.09                      | ~$16.24                              |
-| Endpoints     | Interface VPC Endpoints   | ~$0.04                      | ~$21.60                              |
-|               |                           | Total Session Cost~$0.17    | Ready for Enterprise Pivot           |
+Before applying, manually create the DB password parameter in SSM as a `SecureString` (see Secrets Handling above).
+
+### 3. Apply
+
+```bash
+terraform init
+terraform plan -out=tfplan
+terraform apply tfplan
+```
+
+### 4. Tear-Down
+
+```bash
+terraform destroy -auto-approve
+```
 
 ---
 
 ## Roadmap
 
-- [ ] **Phase 1 — Core Infrastructure** — VPC, ECS Fargate, RDS, ALB, Route 53, Terraform
-- [ ] **Phase 2 — Observability & Threat Detection** — CloudWatch dashboards, WAF, GuardDuty, VPC Flow Logs, CloudTrail
-- [ ] **Phase 3 — Incident Response Runbooks** — 3 documented security scenarios investigated using Phase 2 tooling
-- [ ] **Phase 4 — Security Automation** — GuardDuty → EventBridge → Lambda auto-remediation
+- [x] **Phase 1 — Core Infrastructure** — VPC, subnets, route tables, VPC endpoints, security groups, IAM, ECS Fargate, RDS. Infrastructure built and validated (`terraform plan` clean, ECS task starts and connects to RDS).
+- [ ] **Phase 2 — AWS Well-Architected 6 Pillars** (native AWS tools only) — Operational Excellence, Security, Reliability, Performance Efficiency, Cost Optimization, Sustainability.
+- [ ] **Phase 3 — Infrastructure Automation** — Terraform modules, CI/CD via GitHub Actions, automated validation.
 
 ---
 
 ## What I Learned
 
-_To be completed after Phase 1 is deployed. Will cover real problems encountered and how they were solved._
+This section documents real issues hit during deployment and how they were debugged — not a clean retelling, the actual troubleshooting path.
+
+### 1. ECS Task Role vs. ECS Task Execution Role
+
+Initial assumption: attaching `ssm:GetParameters` to the ECS Task Role would be enough to retrieve credentials from SSM, the same way an application reaches S3 or DynamoDB.
+
+That assumption was wrong for this case. The task definition uses the `secrets` block:
+
+```hcl
+secrets = [
+  {
+    name      = "MM_SQLSETTINGS_DATASOURCE"
+    valueFrom = aws_ssm_parameter.db_password.arn
+  }
+]
+```
+
+When the `secrets` block is used, ECS retrieves the parameter _before_ the container starts — the request comes from the ECS infrastructure itself, not from code running inside the container. As a result, the task failed repeatedly during provisioning, and CloudWatch logs showed permission errors.
+
+![IAM permission error in task provisioning](assets/iam-permission-error.png)
+_Figure 4: Task failing during provisioning due to missing SSM permission_
+
+The fix: move `ssm:GetParameters` to the ECS Task Execution Role instead of the Task Role.
+
+![Execution role with corrected IAM policy](assets/execution-role-fixed-policy.png)
+_Figure 5: Execution role after adding the SSM permission_
+
+**Key insight**
+
+- **Task Execution Role** — used by ECS infrastructure for actions like pulling images from ECR, retrieving secrets from SSM/Secrets Manager, and shipping logs to CloudWatch.
+- **Task Role** — used by the application _inside_ the running container to call AWS services (S3, DynamoDB, SQS, SSM) via SDK/API.
+
+**Takeaway:** if ECS needs the permission before the container starts, it goes on the Task Execution Role. If the application needs it after the container starts, it goes on the Task Role.
+
+### 2. Reserved characters in connection strings (URI encoding)
+
+After fixing the IAM issue, the container started but exited immediately with `EssentialContainerExited`, exit code 1.
+
+![CloudWatch log showing container exit](assets/cloudwatch-container-exit-log.png)
+_Figure 6: CloudWatch stream showing the exit error_
+
+Root cause: the PostgreSQL DSN couldn't be parsed correctly. The database password contained `#`, a reserved URI character that marks the start of a URI fragment — so part of the password was interpreted as URI syntax instead of credential data. Terraform generated the string correctly, but the resulting connection URI was invalid because reserved characters in the password weren't URL-encoded.
+
+Fix: wrap the password with `urlencode()` inside `local.db_dsn`.
+
+```hcl
+locals {
+  db_dsn = "postgres://${var.db_username}:${urlencode(data.aws_ssm_parameter.db_password.value)}@${aws_db_instance.primary.address}:5432/${var.db_name}?sslmode=require"
+}
+```
+
+This properly escapes `#` and any other reserved URI characters.
+
+![Container running successfully after DSN fix](assets/container-running-after-dsn-fix.png)
+_Figure 7: Task running successfully after the encoding fix_
+
+> **Debugging path that worked:** ECS console errors (ENI / log stream) → `describe-tasks` for `stoppedReason` → CloudWatch logs for the actual application error. Each layer — IAM, then application — had to be peeled back in order; fixing one revealed the next.
 
 ---
 
 ## License
 
-Distributed under the MIT License. See LICENSE for more information.
+Distributed under the MIT License. See `LICENSE` for details.
