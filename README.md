@@ -95,8 +95,8 @@ Task definition configuration:
 - Task role policy: `sts:AssumeRole`, `ssm:GetParameters`
 - Container definition (via `jsonencode`): pulls the image from ECR and ships logs to CloudWatch, both over VPC Endpoints
 
-![ECS task console](assets/ecs-task-conssole.png)
-_Figure 3: ECS task running_
+![ECS task console](assets/ecs-service-health.png)
+_Figure 3: ECS Service health_
 
 ### 5. Database (RDS PostgreSQL)
 
@@ -264,10 +264,10 @@ _Figure 5: Execution role after adding the SSM permission_
 
 ### 2. Reserved characters in connection strings (URI encoding)
 
-After fixing the IAM issue, the container started but exited immediately with `EssentialContainerExited`, exit code 1.
+After fixing the IAM issue, the container started but exited immediately with `EssentialContainerExited`, [mattermost] exit code 1.
 
-![CloudWatch log showing container exit](assets/cloudwatch-container-exit-log.png)
-_Figure 6: CloudWatch stream showing the exit error_
+![ECS console errors showing container exit](assets/ecs-console-error.png)
+_Figure 6: ECS console errors showing the exit error_
 
 Root cause: the PostgreSQL DSN couldn't be parsed correctly. The database password contained `#`, a reserved URI character that marks the start of a URI fragment — so part of the password was interpreted as URI syntax instead of credential data. Terraform generated the string correctly, but the resulting connection URI was invalid because reserved characters in the password weren't URL-encoded.
 
@@ -281,7 +281,7 @@ locals {
 
 This properly escapes `#` and any other reserved URI characters.
 
-![Container running successfully after DSN fix](assets/container-running-after-dsn-fix.png)
+![Container running successfully after DSN fix](assets/ecs-task-running.png)
 _Figure 7: Task running successfully after the encoding fix_
 
 > **Debugging path that worked:** ECS console errors (ENI / log stream) → `describe-tasks` for `stoppedReason` → CloudWatch logs for the actual application error. Each layer — IAM, then application — had to be peeled back in order; fixing one revealed the next.
