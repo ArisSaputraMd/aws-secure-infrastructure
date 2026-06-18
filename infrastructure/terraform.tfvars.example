@@ -1,0 +1,7 @@
+aws_region   = "your-resource-region"
+aws_profile  = "default"
+project_name = "your-project-name"
+environment  = "dev/stag/prod"
+domain_name  = "your-domain-name"
+db_username  = "admin-name"
+db_password  = "yourpassword"
