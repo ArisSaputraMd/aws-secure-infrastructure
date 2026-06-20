@@ -6,11 +6,11 @@ A production-like AWS deployment of Mattermost on ECS Fargate, built with Terraf
 
 The project is split into three phases:
 
-- **Phase 1 — Core Infrastructure** (`Built — docs in progress`)
-- **Phase 2 — AWS Well-Architected 6 Pillars** (`Planned`)
+- **Phase 1 — Core Infrastructure** (`completed`)
+- **Phase 2 — AWS Well-Architected 6 Pillars** (`In Proggress`)
 - **Phase 3 — Infrastructure Automation** (`Planned`)
 
-**Status:** Phase 1 of 3 complete (infrastructure built, docs in progress) | `dev` environment | deploy-and-destroy lab model
+**Status:** Phase 1 of 3 completed | `dev` environment | deploy-and-destroy lab model
 
 ---
 
@@ -55,12 +55,12 @@ Public subnets route to the Internet Gateway. Private subnets have no direct int
 
 **Security groups — network segmentation**
 
-| Name               | Inbound                           | Outbound    |
-| ------------------ | --------------------------------- | ----------- |
-| `alb-sg`           | `0.0.0.0/0` on HTTP/80, HTTPS/443 | `0.0.0.0/0` |
-| `ecs-sg`           | `alb-sg` on TCP/8065              | `0.0.0.0/0` |
-| `rds-sg`           | `ecs-sg` on TCP/5432              | `0.0.0.0/0` |
-| `vpc-endpoints-sg` | `10.0.0.0/16` on HTTPS/443        | `0.0.0.0/0` |
+| Name               | Inbound                           | Outbound              |
+| ------------------ | --------------------------------- | --------------------- |
+| `alb-sg`           | `0.0.0.0/0` on HTTP/80, HTTPS/443 | `ecs-sg` on TCP/8065  |
+| `ecs-sg`           | `alb-sg` on TCP/8065              | `rds-sg` on TCP/5432, |
+| `rds-sg`           | `ecs-sg` on TCP/5432              | None                  |
+| `vpc-endpoints-sg` | `ecs-sg` on HTTPS/443             | none                  |
 
 ![VPC resource map console](assets/vpc-resource-map.png)
 _Figure 1: Console view of VPC resource map_
@@ -109,7 +109,7 @@ Configuration:
 - 20 GB `gp2` allocated storage
 - Credentials via SSM (not stored in Terraform)
 - Single-AZ
-- Storage encryption enabled
+- Storage encryption enabled - AWS-managed key
 
 ### 6. Secrets Handling
 
@@ -232,7 +232,7 @@ This section documents real issues hit during deployment and how they were debug
 
 ### 1. ECS Task Role vs. ECS Task Execution Role
 
-Initial assumption: attaching `ssm:GetParameters` to the ECS Task Role would be enough to retrieve credentials from SSM, the same way an application reaches S3 or DynamoDB.
+**Initial assumption:** Attaching `ssm:GetParameters` to the ECS Task Role would be enough to retrieve credentials from SSM, the same way an application reaches S3 or DynamoDB.
 
 That assumption was wrong for this case. The task definition uses the `secrets` block:
 
@@ -269,9 +269,9 @@ After fixing the IAM issue, the container started but exited immediately with `E
 ![ECS console errors showing container exit](assets/ecs-console-error.png)
 _Figure 6: ECS console errors showing the exit error_
 
-Root cause: the PostgreSQL DSN couldn't be parsed correctly. The database password contained `#`, a reserved URI character that marks the start of a URI fragment — so part of the password was interpreted as URI syntax instead of credential data. Terraform generated the string correctly, but the resulting connection URI was invalid because reserved characters in the password weren't URL-encoded.
+**Root cause:** The PostgreSQL DSN couldn't be parsed correctly. The database password contained `#`, a reserved URI character that marks the start of a URI fragment — so part of the password was interpreted as URI syntax instead of credential data. Terraform generated the string correctly, but the resulting connection URI was invalid because reserved characters in the password weren't URL-encoded.
 
-Fix: wrap the password with `urlencode()` inside `local.db_dsn`.
+**Fix:** Wrap the password with `urlencode()` inside `local.db_dsn`.
 
 ```hcl
 locals {
@@ -284,7 +284,70 @@ This properly escapes `#` and any other reserved URI characters.
 ![Container running successfully after DSN fix](assets/ecs-task-running.png)
 _Figure 7: Task running successfully after the encoding fix_
 
-> **Debugging path that worked:** ECS console errors (ENI / log stream) → `describe-tasks` for `stoppedReason` → CloudWatch logs for the actual application error. Each layer — IAM, then application — had to be peeled back in order; fixing one revealed the next.
+**Debugging path that worked:**
+ECS console errors (ENI / log stream) → `describe-tasks` for `stoppedReason` → CloudWatch logs for the actual application error.
+
+> Each layer (IAM, then Application) had to be peeled back in order; fixing one revealed the next.
+
+## 3. Security Group Dependency Cycles in Terraform
+
+While implementing least-privilege security group rules, I encountered a Terraform dependency cycle.
+
+**Security groups — network segmentation**
+
+| Name               | Inbound                           | Outbound             |
+| ------------------ | --------------------------------- | -------------------- |
+| `alb-sg`           | `0.0.0.0/0` on HTTP/80, HTTPS/443 | `ecs-sg` on TCP/8065 |
+| `ecs-sg`           | `alb-sg` on TCP/8065              | `rds-sg` on TCP/5432 |
+| `rds-sg`           | `ecs-sg` on TCP/5432              | None                 |
+| `vpc-endpoints-sg` | `ecs-sg` on HTTPS/443             | None                 |
+
+![terraform cycle error](assets/terraform-error-cycle.png)
+_Figure 8: Console view of terraform cycle error_
+
+**Root cause:** SG rules are declared inline inside the `aws_security_group` resource, each rule that references another SG by ID becomes a dependency of that resource.
+
+- ALB's inline egress block referencing `ecs.id` makes ALB depend on ECS.
+- ECS's inline ingress block referencing `alb.id` makes ecs depend on ALB.
+
+Terraform builds a dependency graph before applying - A depending on B while B depends on A isn't a valid DAG, so the graph walker errors before either resource is created.
+
+**Fix:** Pulling rules out into standalone `aws_vpc_security_group_ingress_rule` / `aws_vpc_security_group_egress_rule` resources breaks this:
+
+- The bare `aws_security_group` resources no longer reference each other, so both get created first with no inline rules.
+- The rule resources, created afterward, are what hold the cross-references and a rule depending on two already-existing SGs isn't a cycle, it's just two leaf nodes.
+
+> Note: Standalone security group rule resources require AWS Provider v5.x or later.
+
+```hcl
+#e.g.
+resource "aws_security_group" "ecs" {     #Security group resource
+...
+}
+
+resource "aws_vpc_security_group_egress_rule" "ecs_to_vpc_endpoint" {     #Security group egress rule
+  security_group_id        = aws_security_group.ecs.id
+  from_port                = 443
+  ...
+  referenced_security_group_id = aws_security_group.vpc_endpoints.id
+}
+```
+
+![validate fixed sg ](/assets/terraform-success-validation.png)
+_Figure 9: Console view of valid configuration_
+
+**Key insight:**
+
+- Allways run `terraform validate` command after add/changging code
+- AWS allows bidirectional SG references, but Terraform needs an acyclic dependency graph.
+
+**Terraform Troubleshoting runbook:**
+
+language/state/core/provider → research → thesis → test → validate → apply/rollback → document.
+
+> _There are four potential types of issues that you could experience with Terraform: language, state, core, and provider errors_
+
+Read more about terraform troubleshooting guidance [here](https://developer.hashicorp.com/terraform/tutorials/configuration-language/troubleshooting-workflow)
 
 ---
 
