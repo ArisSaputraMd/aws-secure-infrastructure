@@ -123,6 +123,41 @@ Database credentials are managed via SSM Parameter Store, not Terraform variable
 
 **Known limitation:** because Terraform writes the DSN to SSM, it also ends up in `.tfstate` in plaintext. For a local-state lab setup that's an accepted tradeoff, but it's called out here rather than glossed over. A real production setup would need a remote backend with encryption and tightly scoped access controls — or a different approach that avoids passing the DSN through Terraform entirely (e.g. constructing it at runtime inside the container, or using Secrets Manager's dynamic reference syntax).
 
+### 7. Security Logging (CloudTrail + S3 + KMS)
+
+Management events are captured across all regions and delivered to S3 as the single store for both long-term retention and investigation.
+
+**Why not CloudWatch Logs?**
+CWL was removed in favour of EventBridge + SNS for alerting and Athena for investigation — same capabilities, lower cost, and CIS Benchmark v5.0 on Security Hub no longer requires it. See decision record for the full reasoning.
+
+**S3 log bucket design**
+
+| Property      | Value                                                                                 |
+| ------------- | ------------------------------------------------------------------------------------- |
+| Encryption    | SSE-KMS with CMK (`bucket_key_enabled = true` to reduce per-object KMS API call cost) |
+| Public access | Fully blocked at bucket level                                                         |
+| Object lock   | COMPLIANCE mode, 365 days — logs cannot be deleted even by the root account           |
+| Versioning    | Enabled (required for object lock)                                                    |
+| Lifecycle     | STANDARD → STANDARD_IA (day 30) → GLACIER_IR (day 90) → DEEP_ARCHIVE (day 365)        |
+
+The lifecycle policy moves logs through cheaper storage tiers as they age without expiring them before the object lock period ends.
+
+**KMS (Customer-Managed Key)**
+
+A dedicated CMK encrypts the S3 bucket. Using a CMK over the AWS-managed default gives key rotation control and fine-grained policy scoping — CloudTrail can only use the key for its own trail ARNs via encryption context conditions.
+
+**Bucket policy scoping**
+
+Both `GetBucketAcl` and `PutObject` grants to the CloudTrail service principal are conditioned on `aws:SourceArn`, scoping delivery to this specific trail only.
+
+**Alerting**
+
+EventBridge rules match specific CloudTrail event patterns (e.g. root usage, IAM changes) and route to SNS for notification. No always-on log ingestion cost.
+
+**Investigation**
+
+Athena queries S3 directly using the CloudTrail table schema. Ad-hoc, pay-per-query — no infrastructure to maintain.
+
 ---
 
 ## Infrastructure Code Layout
@@ -163,6 +198,12 @@ aws-secure-infrastructure/
 | Route 53                    | DNS management                   | Native integration with ALB; handles domain delegation                                       |
 | SSM Parameter Store         | Secrets management               | `SecureString` is free on the standard tier; planned migration to Secrets Manager in Phase 2 |
 | VPC Interface Endpoints     | Private AWS service access       | Removes NAT Gateway cost (~$32/month) for ECR, S3, SSM, CloudWatch Logs                      |
+| CloudTrail                  | Management event capture         | Multi-region, log file validation, delivered to S3                                           |
+| S3 (security logs)          | Immutable log store              | COMPLIANCE object lock, lifecycle tiering, CMK encryption                                    |
+| KMS (CMK)                   | Envelope encryption              | Key rotation, encryption context scoping per service — more control than AWS-managed key     |
+| EventBridge                 | Alerting trigger                 | Pattern-matches CloudTrail events; no always-on ingestion cost vs CloudWatch Logs            |
+| SNS                         | Alert delivery                   | Paired with EventBridge rules for root usage, IAM change notifications                       |
+| Athena                      | Log investigation                | Ad-hoc SQL queries against S3 CloudTrail data; pay-per-query, no infrastructure to maintain  |
 
 ---
 
@@ -174,6 +215,11 @@ aws-secure-infrastructure/
 - **Modular Terraform files over one monolithic file** — easier to navigate and mirrors how the actual infrastructure is organized.
 - **Single-AZ RDS for Phase 1** — Multi-AZ doubles RDS cost with no real benefit in a lab environment.
 - **Native AWS tools only** — Phase 2 (Well-Architected pillars) uses GuardDuty, Security Hub, Config, CloudWatch, Backup, IAM Access Analyzer, and similar. No third-party agents or SIEMs (e.g. Wazuh).
+- **EventBridge + SNS over CloudWatch Logs for alerting** — CloudWatch Logs charges for ingestion (~$0.50/GB) and storage on top of what S3 already holds. EventBridge pattern-matches directly against CloudTrail events at no ingestion cost, and SNS handles delivery. CIS Benchmark v5.0 on Security Hub no longer requires CloudWatch Logs integration, removing the compliance justification for the added cost.
+- **Athena over CloudWatch Logs Insights for investigation** — Athena queries S3 directly at $5/TB scanned with no always-on infrastructure. CloudWatch Logs Insights charges per GB queried on top of ingestion and storage. For a low-volume lab with infrequent ad-hoc queries, Athena is significantly cheaper.
+- **S3 COMPLIANCE Object Lock over GOVERNANCE mode for audit log storage** — Selected to ensure CloudTrail audit logs remain immutable for the full retention period. Unlike GOVERNANCE mode, COMPLIANCE mode prevents deletion or retention bypass even by privileged administrators, protecting forensic evidence from tampering in the event of credential compromise or insider misuse.
+- **CMK over AWS-managed KMS key for CloudTrail** — AWS-managed keys are free but give no policy control. A CMK allows encryption context conditions that scope CloudTrail's key usage to its own trail ARNs only, preventing other services from using the same key under the CloudTrail principal.
+- **Bucket key enabled on S3 encryption** — Without this, S3 makes a KMS API call per object PUT. Enabling the bucket key caches the data key at the S3 layer and reduces KMS API calls significantly, lowering cost at scale.
 - **Deploy and destroy** — the stack is spun up only while actively in use and torn down afterward to avoid idle cost.
 
 ---
