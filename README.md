@@ -340,6 +340,7 @@ _Figure 9: Console view of valid configuration_
 
 - Allways run `terraform validate` command after add/changging code
 - AWS allows bidirectional SG references, but Terraform needs an acyclic dependency graph.
+  > The same ARN-cycle pattern can appear with other resources (e.g. CloudTrail + S3 bucket policy) — if the ARN is predictable, construct it as a local value to break the dependency
 
 **Terraform Troubleshoting runbook:**
 

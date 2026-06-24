@@ -103,6 +103,12 @@ resource "aws_cloudtrail" "management_events" {
 #   - PutObject    (log delivery)
 # Both statements are scoped to this trail's ARN via aws:SourceArn.
 # ------------------------------------------------------------------------------
+data "aws_region" "current" {}
+
+locals {
+  cloudtrail_arn = "arn:aws:cloudtrail:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:trail/${var.project_name}-${var.environment}-cloudtrail"
+}
+
 data "aws_iam_policy_document" "cloudtrail" {
   statement {
     sid    = "AWSCloudTrailAclCheck"
@@ -119,7 +125,7 @@ data "aws_iam_policy_document" "cloudtrail" {
     condition {
       test     = "StringEquals"
       variable = "aws:SourceArn"
-      values   = [aws_cloudtrail.management_events.arn]
+      values   = [local.cloudtrail_arn]
     }
   }
 
@@ -143,7 +149,7 @@ data "aws_iam_policy_document" "cloudtrail" {
     condition {
       test     = "StringEquals"
       variable = "aws:SourceArn"
-      values   = [aws_cloudtrail.management_events.arn]
+      values   = [local.cloudtrail_arn]
     }
   }
 }
@@ -330,8 +336,9 @@ resource "aws_s3_bucket_public_access_block" "security_logs" {
 # Bucket Policy — CloudTrail write permissions
 # ------------------------------------------------------------------------------
 resource "aws_s3_bucket_policy" "security_logs_policy" {
-  bucket = aws_s3_bucket.security_logs.id
-  policy = data.aws_iam_policy_document.cloudtrail.json
+  depends_on = [data.aws_iam_policy_document.cloudtrail]
+  bucket     = aws_s3_bucket.security_logs.id
+  policy     = data.aws_iam_policy_document.cloudtrail.json
 }
 
 
