@@ -16,7 +16,7 @@ The project is split into three phases:
 
 ## Architecture Diagram
 
-![architecture diagram](assets/architecture-diagram.png)
+![architecture diagram](docs/assets/architecture-diagram.png)
 
 ---
 
@@ -62,7 +62,7 @@ Public subnets route to the Internet Gateway. Private subnets have no direct int
 | `rds-sg`           | `ecs-sg` on TCP/5432              | None                  |
 | `vpc-endpoints-sg` | `ecs-sg` on HTTPS/443             | none                  |
 
-![VPC resource map console](assets/vpc-resource-map.png)
+![VPC resource map console](docs/assets/vpc-resource-map.png)
 _Figure 1: Console view of VPC resource map_
 
 ### 2. Route 53
@@ -73,7 +73,7 @@ DNS management for the application domain via a hosted zone, which holds records
 - Application domain and subdomains
 - Alias record pointing to the ALB
 
-![mattermost.aris-saputra.dev screenshot](assets/mattermost.aris-saputra.dev-website.png)
+![mattermost.aris-saputra.dev screenshot](docs/assets/mattermost.aris-saputra.dev-website.png)
 _Figure 2: mattermost.aris-saputra.dev_
 
 ### 3. Application Load Balancer + TLS (ALB + ACM)
@@ -95,7 +95,7 @@ Task definition configuration:
 - Task role policy: `sts:AssumeRole`, `ssm:GetParameters`
 - Container definition (via `jsonencode`): pulls the image from ECR and ships logs to CloudWatch, both over VPC Endpoints
 
-![ECS task console](assets/ecs-service-health.png)
+![ECS task console](docs/assets/ecs-service-health.png)
 _Figure 3: ECS Service health_
 
 ### 5. Database (RDS PostgreSQL)
@@ -247,12 +247,12 @@ secrets = [
 
 When the `secrets` block is used, ECS retrieves the parameter _before_ the container starts — the request comes from the ECS infrastructure itself, not from code running inside the container. As a result, the task failed repeatedly during provisioning, and CloudWatch logs showed permission errors.
 
-![IAM permission error in task provisioning](assets/iam-permission-error.png)
+![IAM permission error in task provisioning](docs/assets/iam-permission-error.png)
 _Figure 4: Task failing during provisioning due to missing SSM permission_
 
 The fix: move `ssm:GetParameters` to the ECS Task Execution Role instead of the Task Role.
 
-![Execution role with corrected IAM policy](assets/execution-role-fixed-policy.png)
+![Execution role with corrected IAM policy](docs/assets/execution-role-fixed-policy.png)
 _Figure 5: Execution role after adding the SSM permission_
 
 **Key insight**
@@ -266,7 +266,7 @@ _Figure 5: Execution role after adding the SSM permission_
 
 After fixing the IAM issue, the container started but exited immediately with `EssentialContainerExited`, [mattermost] exit code 1.
 
-![ECS console errors showing container exit](assets/ecs-console-error.png)
+![ECS console errors showing container exit](docs/assets/ecs-console-error.png)
 _Figure 6: ECS console errors showing the exit error_
 
 **Root cause:** The PostgreSQL DSN couldn't be parsed correctly. The database password contained `#`, a reserved URI character that marks the start of a URI fragment — so part of the password was interpreted as URI syntax instead of credential data. Terraform generated the string correctly, but the resulting connection URI was invalid because reserved characters in the password weren't URL-encoded.
@@ -281,7 +281,7 @@ locals {
 
 This properly escapes `#` and any other reserved URI characters.
 
-![Container running successfully after DSN fix](assets/ecs-task-running.png)
+![Container running successfully after DSN fix](docs/assets/ecs-task-running.png)
 _Figure 7: Task running successfully after the encoding fix_
 
 **Debugging path that worked:**
@@ -302,7 +302,7 @@ While implementing least-privilege security group rules, I encountered a Terrafo
 | `rds-sg`           | `ecs-sg` on TCP/5432              | None                 |
 | `vpc-endpoints-sg` | `ecs-sg` on HTTPS/443             | None                 |
 
-![terraform cycle error](assets/terraform-error-cycle.png)
+![terraform cycle error](docs/assets/terraform-error-cycle.png)
 _Figure 8: Console view of terraform cycle error_
 
 **Root cause:** SG rules are declared inline inside the `aws_security_group` resource, each rule that references another SG by ID becomes a dependency of that resource.
@@ -333,7 +333,7 @@ resource "aws_vpc_security_group_egress_rule" "ecs_to_vpc_endpoint" {     #Secur
 }
 ```
 
-![validate fixed sg ](/assets/terraform-success-validation.png)
+![validate fixed sg ](docs/assets/terraform-success-validation.png)
 _Figure 9: Console view of valid configuration_
 
 **Key insight:**
