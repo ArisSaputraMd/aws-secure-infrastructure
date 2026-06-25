@@ -1,79 +1,3 @@
-# ==============================================================================
-# cloudtrail.tf
-# Provisions CloudTrail management event trail with:
-#   - S3 delivery (encrypted, object-locked)
-#   - KMS envelope encryption
-#   - CloudWatch Logs delivery for near-real-time metric filter alerting
-# ==============================================================================
-
-
-# ------------------------------------------------------------------------------
-# CloudWatch Log Group
-# Receives CloudTrail events for metric filter alerting (CreateUser, root usage, etc.)
-# Retention set with variable (set based on env requirement, default is 30 days) — S3 is the long-term store; CWL is for alerting only.
-# ------------------------------------------------------------------------------
-resource "aws_cloudwatch_log_group" "cloudtrail" {
-  name              = "/aws/cloudtrail/${var.project_name}-${var.environment}"
-  retention_in_days = var.cloudtrail_log_group_retention_days
-  kms_key_id        = aws_kms_key.security_logs.arn
-
-  tags = {
-    Name        = "${var.project_name}-${var.environment}-cloudtrail-log-group"
-    Environment = var.environment
-    Project     = var.project_name
-  }
-}
-
-
-# ------------------------------------------------------------------------------
-# IAM Role — CloudTrail → CloudWatch Logs
-# CloudTrail assumes this role to write log events into the CWL group above.
-# ------------------------------------------------------------------------------
-
-# Trust policy: allow CloudTrail service to assume this role
-data "aws_iam_policy_document" "cloudtrail_cw_assume_role" {
-  statement {
-    sid     = "CloudTrailAssumeRole"
-    actions = ["sts:AssumeRole"]
-    principals {
-      type        = "Service"
-      identifiers = ["cloudtrail.amazonaws.com"]
-    }
-  }
-}
-
-# Permission policy: only allow writing to this specific log group
-data "aws_iam_policy_document" "cloudtrail_cw_permissions" {
-  statement {
-    sid    = "AllowCloudTrailLogDelivery"
-    effect = "Allow"
-    actions = [
-      "logs:CreateLogStream",
-      "logs:PutLogEvents",
-    ]
-    # The :* suffix is required — CloudTrail targets log streams, not just the group
-    resources = ["${aws_cloudwatch_log_group.cloudtrail.arn}:*"]
-  }
-}
-
-resource "aws_iam_role" "cloudtrail_cw" {
-  name               = "${var.project_name}-${var.environment}-cloudtrail-cw-role"
-  assume_role_policy = data.aws_iam_policy_document.cloudtrail_cw_assume_role.json
-
-  tags = {
-    Name        = "${var.project_name}-${var.environment}-cloudtrail-cw-role"
-    Environment = var.environment
-    Project     = var.project_name
-  }
-}
-
-resource "aws_iam_role_policy" "cloudtrail_cw" {
-  name   = "${var.project_name}-${var.environment}-cloudtrail-cw-policy"
-  role   = aws_iam_role.cloudtrail_cw.id
-  policy = data.aws_iam_policy_document.cloudtrail_cw_permissions.json
-}
-
-
 # ------------------------------------------------------------------------------
 # CloudTrail — Management Events Trail
 # Multi-region, all management events (read + write), global service events.
@@ -90,9 +14,6 @@ resource "aws_cloudtrail" "management_events" {
   include_global_service_events = true
   is_multi_region_trail         = true
   enable_log_file_validation    = true
-
-  cloud_watch_logs_group_arn = "${aws_cloudwatch_log_group.cloudtrail.arn}:*"
-  cloud_watch_logs_role_arn  = aws_iam_role.cloudtrail_cw.arn
 }
 
 
@@ -157,7 +78,7 @@ data "aws_iam_policy_document" "cloudtrail" {
 
 # ==============================================================================
 # kms.tf
-# Customer-managed KMS key (CMK) for encrypting CloudTrail logs in S3 and CWL.
+# Customer-managed KMS key (CMK) for encrypting CloudTrail logs in S3.
 # Using CMK over AWS-managed key gives: key rotation control, fine-grained
 # policy, cross-service grant scoping.
 # ==============================================================================
@@ -221,30 +142,6 @@ data "aws_iam_policy_document" "kms_policy" {
       test     = "StringLike"
       variable = "kms:EncryptionContext:aws:cloudtrail:arn"
       values   = ["arn:aws:cloudtrail:*:${data.aws_caller_identity.current.account_id}:trail/*"]
-    }
-  }
-
-  # CloudWatch Logs: needed so the CWL log group (which also uses this key) can
-  # encrypt log events delivered by CloudTrail.
-  statement {
-    sid    = "EnableCloudWatchLogsPermissions"
-    effect = "Allow"
-    principals {
-      type        = "Service"
-      identifiers = ["logs.amazonaws.com"]
-    }
-    actions = [
-      "kms:GenerateDataKey*",
-      "kms:Decrypt",
-      "kms:Encrypt",
-      "kms:ReEncrypt*",
-      "kms:DescribeKey",
-    ]
-    resources = ["*"]
-    condition {
-      test     = "ArnLike"
-      variable = "kms:EncryptionContext:aws:logs:arn"
-      values   = ["arn:aws:logs:*:${data.aws_caller_identity.current.account_id}:*"]
     }
   }
 }
@@ -412,11 +309,7 @@ variable "logs_bucket_force_destroy" {
   default     = false
 }
 
-variable "cloudtrail_log_group_retention_days" {
-  type        = number
-  description = "CloudWatch Log Group retention for CloudTrail events"
-  default     = 30
-}
+
 
 variable "bucket_compliance_days" {
   type        = number
