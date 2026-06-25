@@ -11,6 +11,14 @@ The diagram below shows the full request path and the relationships between infr
 
 ---
 
+## Deployment Context
+
+This deployment targets a medium-sized organization that prioritizes operational simplicity and cost efficiency without compromising on security posture. The platform is self-hosted to retain data control and avoid per-seat SaaS costs at scale.
+
+Design decisions throughout this project such as compute launch type, networking approach, secrets management, state handling, etc. are made within these constraints. See the [decision records](../decision-records/) for the reasoning behind each major choice.
+
+---
+
 ## 1. Networking
 
 **VPC**
