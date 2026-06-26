@@ -62,3 +62,16 @@ These limitations are acceptable because preserving audit log integrity is more 
 - Incident investigations can rely on stronger evidence integrity guarantees.
 - Privileged-user and root account log tampering risk is eliminated during the retention window.
 - Administrative flexibility is reduced in favor of stronger integrity controls.
+
+---
+
+## Note
+
+Object lock behavior is controlled by `logs_bucket_object_lock` in `terraform.tfvars`:
+
+| Environment | Value   | Behavior                                                                                        |
+| ----------- | ------- | ----------------------------------------------------------------------------------------------- |
+| `dev`       | `false` | No object lock — `terraform destroy` completes cleanly                                          |
+| `prod`      | `true`  | COMPLIANCE mode, 365-day retention — objects cannot be deleted by anyone during the lock period |
+
+In `dev`, `terraform destroy` works normally. In `prod`, the CloudTrail S3 bucket **cannot be destroyed** until all objects' lock periods expire — this is intentional. COMPLIANCE mode ensures audit logs cannot be tampered with even under credential compromise. Plan accordingly before running `destroy` against a prod environment.
