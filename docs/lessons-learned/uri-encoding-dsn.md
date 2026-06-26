@@ -10,6 +10,9 @@ The container started but exited immediately with `EssentialContainerExited`, ex
 
 The PostgreSQL DSN couldn't be parsed correctly. The database password contained `#`, a reserved URI character that marks the start of a URI fragment, so the parser stopped reading the password at `#` and interpreted the remainder as URI syntax instead of credential data. Terraform generated the string correctly, but the resulting connection URI was invalid because reserved characters in the password weren't URL-encoded before being interpolated into the DSN.
 
+![ECS console errors showing container exit](../assets/ecs-console-error.png)
+_Figure 1: ECS console errors showing the exit error_
+
 ## Debugging Path
 
 ```
@@ -38,6 +41,9 @@ locals {
 ```
 
 `urlencode()` is a built-in Terraform function, no external dependency needed.
+
+![Container running successfully after DSN fix](../assets/ecs-task-running.png)
+_Figure 2: Task running successfully after the encoding fix_
 
 ## Key Insight
 

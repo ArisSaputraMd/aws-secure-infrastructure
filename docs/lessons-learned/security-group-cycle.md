@@ -8,9 +8,8 @@ Declaring security group rules inline inside the `aws_security_group` resource b
 
 Terraform threw a dependency cycle error during plan:
 
-```
-Error: Cycle: aws_security_group.alb, aws_security_group.ecs
-```
+![terraform cycle error](../assets/terraform-error-cycle.png)
+_Figure 1: Console view of terraform cycle error_
 
 **Root cause:** SG rules declared inline inside the `aws_security_group` resource create implicit dependencies on whatever SG IDs they reference:
 
@@ -57,6 +56,9 @@ resource "aws_vpc_security_group_egress_rule" "ecs_to_vpc_endpoint" {
 With this pattern, the bare `aws_security_group` resources no longer reference each other — both are created first with no inline rules. The rule resources are created afterward and hold the cross-references. A rule depending on two already-existing SGs is not a cycle — it is two leaf nodes in the graph.
 
 > Standalone security group rule resources require AWS Provider v5.x or later.
+
+![validate fixed sg ](../assets/terraform-success-validation.png)
+_Figure 2: Console view of valid configuration_
 
 ## Key Insight
 

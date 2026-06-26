@@ -19,6 +19,9 @@ secrets = [
 
 When the `secrets` block is used, ECS retrieves the parameter _before_ the container starts — the request comes from the ECS infrastructure itself, not from code running inside the container. The task failed repeatedly during provisioning with permission errors because the wrong role had the policy.
 
+![IAM permission error in task provisioning](../assets/iam-permission-error.png)
+_Figure 1: Task failing during provisioning due to missing SSM permission_
+
 ## Debugging Path
 
 ```
@@ -48,6 +51,9 @@ resource "aws_iam_role_policy" "ecs_execution_ssm" {
   })
 }
 ```
+
+![Execution role with corrected IAM policy](../assets/execution-role-fixed-policy.png)
+_Figure 2: Execution role after adding the SSM permission_
 
 ## Key Insight
 
