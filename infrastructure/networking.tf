@@ -251,6 +251,10 @@ resource "aws_vpc_security_group_egress_rule" "alb_egress" {
 
 # Security Group — ECS
 # Allows traffic only from the ALB — not directly from the internet
+
+data "aws_prefix_list" "s3" {
+  name = "com.amazonaws.${var.aws_region}.s3"
+}
 resource "aws_security_group" "ecs" {
   name        = "${var.project_name}-${var.environment}-ecs-sg"
   description = "Allow traffic from ALB only"
@@ -290,6 +294,14 @@ resource "aws_vpc_security_group_egress_rule" "ecs_vpc_endpoints" {
   referenced_security_group_id = aws_security_group.vpc_endpoints.id
 }
 
+resource "aws_vpc_security_group_egress_rule" "ecs_s3" {
+  description       = "Allow HTTPS to S3 for ECR image layers"
+  from_port         = 443
+  to_port           = 443
+  ip_protocol       = "tcp"
+  security_group_id = aws_security_group.ecs.id
+  prefix_list_id    = data.aws_prefix_list.s3.id
+}
 
 # Security Group — RDS
 # Allows PostgreSQL only from ECS — nothing else
