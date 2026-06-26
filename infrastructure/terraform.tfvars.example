@@ -1,7 +1,17 @@
 aws_region   = "your-resource-region"
 aws_profile  = "default"
 project_name = "your-project-name"
-environment  = "dev/stag/prod"
+environment  = "dev"
 domain_name  = "your-domain-name"
 db_username  = "admin-name"
-db_password  = "yourpassword"
+
+# Object lock settings
+# For active development — object lock disabled, bucket deletable, short compliance window for testing
+logs_bucket_object_lock   = false
+logs_bucket_force_destroy = true
+bucket_compliance_days    = 1
+
+# For production — uncomment and replace the block above
+# logs_bucket_object_lock   = true
+# logs_bucket_force_destroy = false
+# bucket_compliance_days    = 365
