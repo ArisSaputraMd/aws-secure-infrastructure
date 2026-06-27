@@ -88,7 +88,7 @@ data "aws_iam_policy_document" "cloudtrail" {
 # KMS Key
 # ------------------------------------------------------------------------------
 resource "aws_kms_key" "security_logs" {
-  description             = "CMK for encrypting CloudTrail logs — S3 and CloudWatch Logs"
+  description             = "CMK for encrypting CloudTrail logs — S3"
   deletion_window_in_days = 30
   enable_key_rotation     = true
 

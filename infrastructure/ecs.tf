@@ -59,6 +59,23 @@ resource "aws_ecs_task_definition" "mattermost" {
         {
           name  = "MM_SERVICESETTINGS_SITEURL"
           value = "https://${var.domain_name}"
+        },
+        # S3 file storage
+        {
+          name  = "MM_FILESETTINGS_DRIVERNAME"
+          value = "amazons3"
+        },
+        {
+          name  = "MM_FILESETTINGS_AMAZONS3BUCKET"
+          value = aws_s3_bucket.mattermost_files.id
+        },
+        {
+          name  = "MM_FILESETTINGS_AMAZONS3REGION"
+          value = var.aws_region
+        },
+        {
+          name  = "MM_FILESETTINGS_AMAZONS3SSL"
+          value = "true"
         }
       ]
 

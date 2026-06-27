@@ -48,7 +48,14 @@ variable "ecs_cluster_name" {
   default     = "mattermost-cluster"
 }
 
-
+# =============================================
+# S3
+# =============================================
+variable "mattermost_files_force_destroy" {
+  description = "Delete S3 bucket when Terraform destroy"
+  type        = bool
+  default     = false
+}
 # =============================================
 # Database
 # =============================================

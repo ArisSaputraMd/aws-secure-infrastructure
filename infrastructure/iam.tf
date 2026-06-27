@@ -29,6 +29,18 @@ data "aws_iam_policy_document" "ecs_task_ssm_policy" {
   }
 }
 
+# KMS permission for Task role
+data "aws_iam_policy_document" "ecs_task_kms_policy" {
+  statement {
+    effect = "Allow"
+    actions = [
+      "kms:GenerateDataKey*",
+      "kms:Decrypt"
+    ]
+    resources = [aws_kms_key.mattermost_files.arn]
+  }
+}
+
 # ECS Task Execution Role
 # Used by ECS to: pull image from ECR, send logs to CloudWatch
 resource "aws_iam_role" "ecs_task_execution_role" {
@@ -56,7 +68,8 @@ resource "aws_iam_role_policy_attachment" "ecs_task_execution_role_policy" {
 
 
 # ECS Task Role
-# Used by the container itself at runtime: read DB password from SSM
+# Used by the container itself at runtime: read and write to s3
+
 resource "aws_iam_role" "ecs_task_role" {
   name               = "${var.project_name}-${var.environment}-ecs-task-role"
   assume_role_policy = data.aws_iam_policy_document.ecs_assume_role_policy.json
@@ -66,8 +79,10 @@ resource "aws_iam_role" "ecs_task_role" {
     Project     = var.project_name
   }
 }
-resource "aws_iam_role_policy" "ecs_task_ssm_policy" {
-  name   = "${var.project_name}-${var.environment}-ssm-read-policy"
+
+resource "aws_iam_role_policy" "ecs_task_kms_policy" {
+  name   = "${var.project_name}-${var.environment}-kms-policy"
   role   = aws_iam_role.ecs_task_role.id
-  policy = data.aws_iam_policy_document.ecs_task_ssm_policy.json
+  policy = data.aws_iam_policy_document.ecs_task_kms_policy.json
 }
+

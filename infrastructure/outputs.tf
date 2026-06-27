@@ -27,3 +27,20 @@ output "rds_endpoint" {
   value       = aws_db_instance.primary.address
   sensitive   = true
 }
+
+output "security_log_bucket" {
+  description = "Security Logs Bucket ARN"
+  value       = aws_s3_bucket.security_logs.arn
+  sensitive   = true
+}
+
+output "mattermost_bucket_ids" {
+  description = "Mattermost file storage id"
+  value       = aws_s3_bucket.mattermost_files.id
+}
+
+output "mattermost_bucket_arn" {
+  description = "Mattermost bucket ARN"
+  value       = aws_s3_bucket.mattermost_files.arn
+  sensitive   = true
+}
