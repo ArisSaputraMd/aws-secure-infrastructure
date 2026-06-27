@@ -50,12 +50,12 @@ Public subnets route to the Internet Gateway. Private subnets have no direct int
 
 **Security groups — network segmentation**
 
-| Security Group     | Inbound                           | Outbound                                              |
-| ------------------ | --------------------------------- | ----------------------------------------------------- |
-| `alb-sg`           | `0.0.0.0/0` on HTTP/80, HTTPS/443 | `ecs-sg` on TCP/8065                                  |
-| `ecs-sg`           | `alb-sg` on TCP/8065              | `rds-sg` on TCP/5432, `vpc-endpoints-sg` on HTTPS/443 |
-| `rds-sg`           | `ecs-sg` on TCP/5432              | None                                                  |
-| `vpc-endpoints-sg` | `ecs-sg` on HTTPS/443             | None                                                  |
+| Security Group     | Inbound                           | Outbound                                                                   |
+| ------------------ | --------------------------------- | -------------------------------------------------------------------------- |
+| `alb-sg`           | `0.0.0.0/0` on HTTP/80, HTTPS/443 | `ecs-sg` on TCP/8065                                                       |
+| `ecs-sg`           | `alb-sg` on TCP/8065              | `rds-sg` on TCP/5432, `vpc-endpoints-sg` on HTTPS/443, S3 Gateway Endpoint |
+| `rds-sg`           | `ecs-sg` on TCP/5432              | None                                                                       |
+| `vpc-endpoints-sg` | `ecs-sg` on HTTPS/443             | None                                                                       |
 
 All security group rules are defined in [networking.tf](../../infrastructure/networking.tf).
 
@@ -96,8 +96,9 @@ Task definition configuration:
 - Execution role: `sts:AssumeRole`, `AmazonECSTaskExecutionRolePolicy`,
   `ssm:GetParameters` scoped to the DSN parameter ARN — handles secret
   injection at container startup
-- Task role: `sts:AssumeRole` — used by the running application; does not
-  require SSM access
+- Task role: `sts:AssumeRole` — used by the running application for S3 file
+  storage operations (`s3:GetObject`, `s3:PutObject`, `s3:DeleteObject`,
+  `s3:ListBucket`) and KMS decryption; does not require SSM access
 - Container definition (via `jsonencode`): pulls the image from ECR and ships
   logs to CloudWatch, both over VPC Endpoints
 
@@ -132,12 +133,56 @@ Database credentials are managed via SSM Parameter Store, not Terraform variable
 **Known limitation:** Because Terraform writes the DSN to SSM, the value also ends up in `.tfstate` in plaintext. For a local-state lab setup this is an accepted tradeoff, but it is called out here rather than glossed over.
 A production setup would require a remote backend with encryption and tightly-scoped access controls — or an approach that avoids passing the DSN through Terraform entirely, such as constructing it at runtime inside the container or using Secrets Manager's native ECS integration.
 
-See [ADR-002](../decision-records/adr-002-ssm-parameter-store-over-secrets-manager.md)
-for the full reasoning.
+See [ADR-002](../decision-records/adr-002-ssm-parameter-store-over-secrets-manager.md) for the full reasoning.
 
 ---
 
-## 7. Security Logging and Alerting _(Phase 2 — In Progress)_
+## 7. File Storage (S3)
+
+Fargate containers have no persistent local disk. Mattermost's default local filesystem driver is incompatible with this model — any file uploaded by a user would be lost when the task is replaced or restarted. S3 is used as the persistent file store for all user-uploaded content.
+
+**Authorization model**
+
+Mattermost is the sole intermediary between users and S3. Users never hold AWS credentials and make no S3 API calls directly. When a user uploads a file, Mattermost receives it via its own API, writes it to S3 using the ECS task role, and records the file metadata (owner, channel, post) in RDS. Access control for who can read or delete a file is enforced entirely by Mattermost via RDS — S3 stores raw bytes only. No per-user, per-team, or per-channel IAM configuration is required.
+
+**Bucket configuration**
+
+| Property        | Value                                                                                          |
+| --------------- | ---------------------------------------------------------------------------------------------- |
+| Name            | `{project}-{environment}-mattermost-files-{account_id}` — account ID ensures global uniqueness |
+| Encryption      | SSE-KMS with CMK (`bucket_key_enabled = true` to reduce per-object KMS API call cost)          |
+| Public access   | Fully blocked at bucket level                                                                  |
+| Versioning      | Enabled — supports recovery of accidentally deleted files                                      |
+| Lifecycle       | Noncurrent versions: STANDARD_IA (day 30) → GLACIER (day 60) → expire (day 90)                 |
+| Tiering         | Intelligent-Tiering enabled on current objects; ARCHIVE_ACCESS tier at 90 days                 |
+| `force_destroy` | Controlled via variable — must be `false` in production to prevent data loss on destroy        |
+
+**IAM**
+
+The ECS task role is granted `s3:GetObject`, `s3:PutObject`, `s3:DeleteObject`, and `s3:ListBucket` via both a bucket policy on the S3 side and a KMS key policy allowing `kms:GenerateDataKey*` and `kms:Decrypt` for envelope encryption operations.
+
+**Network path**
+
+ECS tasks reach S3 through the existing S3 Gateway Endpoint — no NAT Gateway or additional interface endpoint is required. S3 Gateway Endpoints carry no per-hour charge, only standard S3 data transfer and request costs apply.
+
+**Mattermost configuration**
+
+S3 is configured via environment variables in the ECS task definition:
+
+| Variable                         | Value            |
+| -------------------------------- | ---------------- |
+| `MM_FILESETTINGS_DRIVERNAME`     | `amazons3`       |
+| `MM_FILESETTINGS_AMAZONS3BUCKET` | bucket name      |
+| `MM_FILESETTINGS_AMAZONS3REGION` | `ap-southeast-3` |
+| `MM_FILESETTINGS_AMAZONS3SSL`    | `true`           |
+
+No access key or secret is configured — Mattermost inherits credentials from the ECS task role via the instance metadata service.
+
+See [ADR-010](../decision-records/adr-010-s3-file-storage-over-efs.md) for the decision between S3 and EFS.
+
+---
+
+## 8. Security Logging and Alerting _(Phase 2 — In Progress)_
 
 > The components in this section are part of Phase 2 and are being implemented incrementally. This section reflects the target state, not the current deployed state.
 

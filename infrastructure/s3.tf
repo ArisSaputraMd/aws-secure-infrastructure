@@ -191,7 +191,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "mattermost_files_versions" {
     filter {}
 
     noncurrent_version_expiration {
-      noncurrent_days = 90
+      noncurrent_days = 180
     }
 
     noncurrent_version_transition {
