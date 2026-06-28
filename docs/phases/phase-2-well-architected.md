@@ -1,3 +1,9 @@
+### Components delivered
+
+| Component     | Decision rationale                                                            |
+| ------------- | ----------------------------------------------------------------------------- |
+| VPC Flow Logs | Send logs to CloudWatch logs group, capture metadata of all traffic type IP's |
+
 **Alerting**
 
 EventBridge rules match specific CloudTrail event patterns and route to SNS for notification. Controls are aligned to CIS AWS Foundations Benchmark v5.0, covering:
