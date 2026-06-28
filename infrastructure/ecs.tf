@@ -4,7 +4,7 @@
 # CloudWatch Log Group — stores Mattermost container logs
 resource "aws_cloudwatch_log_group" "ecs" {
   name              = "/ecs/${var.project_name}-${var.environment}"
-  retention_in_days = 7
+  retention_in_days = 30
 
   tags = {
     Name        = "${var.project_name}-${var.environment}-ecs-logs"
