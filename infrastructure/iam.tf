@@ -1,5 +1,5 @@
 # =============================================
-# IAM Roles and Pilicies for ECS Tasks
+# IAM Roles and Policies for ECS Tasks
 # =============================================
 
 # Fetch current AWS account ID dynamically
@@ -86,3 +86,56 @@ resource "aws_iam_role_policy" "ecs_task_kms_policy" {
   policy = data.aws_iam_policy_document.ecs_task_kms_policy.json
 }
 
+# =============================================
+# IAM Roles and Policies for VPC Flow Logs
+# =============================================
+
+# vpc flow logs iam role 
+data "aws_iam_policy_document" "flow_logs_assume_role" {
+  statement {
+    effect = "Allow"
+
+    principals {
+      type        = "Service"
+      identifiers = ["vpc-flow-logs.amazonaws.com"]
+    }
+
+    actions = ["sts:AssumeRole"]
+  }
+}
+
+resource "aws_iam_role" "flow_logs_role" {
+  name               = "${var.project_name}-${var.environment}-flow-logs-role"
+  assume_role_policy = data.aws_iam_policy_document.flow_logs_assume_role.json
+
+  tags = {
+    Name        = "${var.project_name}-${var.environment}-flow-logs-role"
+    Environment = var.environment
+    Project     = var.project_name
+  }
+}
+
+data "aws_iam_policy_document" "flow_logs_policy" {
+  statement {
+    effect = "Allow"
+
+    actions = [
+      "logs:CreateLogGroup",
+      "logs:CreateLogStream",
+      "logs:PutLogEvents",
+      "logs:DescribeLogGroups",
+      "logs:DescribeLogStreams",
+    ]
+
+    resources = [
+      aws_cloudwatch_log_group.vpc.arn,
+      "${aws_cloudwatch_log_group.vpc.arn}:*"
+    ]
+  }
+}
+
+resource "aws_iam_role_policy" "flow_logs" {
+  name   = "${var.project_name}-${var.environment}-flow-logs-role-policy"
+  role   = aws_iam_role.flow_logs_role.id
+  policy = data.aws_iam_policy_document.flow_logs_policy.json
+}
