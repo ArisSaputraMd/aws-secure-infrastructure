@@ -25,7 +25,7 @@ resource "aws_cloudtrail" "management_events" {
 data "aws_region" "current" {}
 
 locals {
-  cloudtrail_arn = "arn:aws:cloudtrail:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:trail/${var.project_name}-${var.environment}-cloudtrail"
+  cloudtrail_arn = "arn:aws:cloudtrail:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:trail/${var.project_name}-${var.environment}-cloudtrail"
 }
 
 data "aws_iam_policy_document" "security_logs_policy" {

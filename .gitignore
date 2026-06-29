@@ -54,4 +54,4 @@ worklog.md
 # Ignore tfplan
 tfplan.output
 *.tfplan
-plan.out
+tfplan.out
