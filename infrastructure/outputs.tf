@@ -28,19 +28,64 @@ output "rds_endpoint" {
   sensitive   = true
 }
 
-output "security_log_bucket" {
+output "security_log_bucket_name" {
+  description = "Security Logs bucket name"
+  value       = aws_s3_bucket.security_logs.bucket
+}
+
+output "security_log_bucket_arn" {
   description = "Security Logs Bucket ARN"
   value       = aws_s3_bucket.security_logs.arn
   sensitive   = true
 }
 
-output "mattermost_bucket_ids" {
-  description = "Mattermost file storage id"
-  value       = aws_s3_bucket.mattermost_files.id
+output "mattermost_bucket_name" {
+  description = "Mattermost bucket name"
+  value       = aws_s3_bucket.mattermost_files.bucket
 }
 
 output "mattermost_bucket_arn" {
   description = "Mattermost bucket ARN"
   value       = aws_s3_bucket.mattermost_files.arn
   sensitive   = true
+}
+
+output "vpc_flow_log_arn" {
+  description = "Vpc flow logs arn"
+  value       = aws_flow_log.vpc.arn
+}
+
+output "vpc_cw_log_group_arn" {
+  description = "Destination for vpc flow logs"
+  value       = aws_cloudwatch_log_group.vpc.arn
+}
+
+output "flow_logs_role" {
+  description = "Role for flow logs ARN"
+  value       = aws_iam_role.flow_logs.arn
+}
+
+output "config_recorder" {
+  description = "AWS Config configurations recorder"
+  value       = aws_config_configuration_recorder.config.arn
+}
+
+output "config_channel" {
+  description = "AWS Config Channel"
+  value       = aws_config_delivery_channel.config.arn
+}
+
+output "config_recorder_status" {
+  description = "AWS Config recorder status"
+  value       = aws_config_configuration_recorder_status.config.arn
+}
+
+output "config_role" {
+  description = "Role for AWS config arn"
+  value       = aws_iam_role.config_role.arn
+}
+
+output "config_kms" {
+  description = "kms key for security logs bucket"
+  value       = aws_s3_bucket.security_logs.arn
 }

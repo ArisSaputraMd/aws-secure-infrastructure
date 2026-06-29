@@ -38,7 +38,15 @@ data "aws_iam_policy_document" "sns_topic_policy" {
       identifiers = ["events.amazonaws.com"]
     }
 
-    resources = ["*"]
+    resources = [
+      aws_sns_topic.cloudtrail_changes.arn,
+      aws_sns_topic.console_login_no_mfa.arn,
+      aws_sns_topic.iam_warning.arn,
+      aws_sns_topic.kms_key_changes.arn,
+      aws_sns_topic.root_usage.arn,
+      aws_sns_topic.nacl_changes.arn,
+      aws_sns_topic.sg_changes.arn
+    ]
   }
 }
 
