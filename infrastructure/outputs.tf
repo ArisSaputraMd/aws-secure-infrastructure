@@ -62,22 +62,22 @@ output "vpc_cw_log_group_arn" {
 
 output "flow_logs_role" {
   description = "Role for flow logs ARN"
-  value       = aws_iam_role.flow_logs.arn
+  value       = aws_iam_role.flow_logs_role.arn
 }
 
 output "config_recorder" {
   description = "AWS Config configurations recorder"
-  value       = aws_config_configuration_recorder.config.arn
+  value       = aws_config_configuration_recorder.config.id
 }
 
 output "config_channel" {
   description = "AWS Config Channel"
-  value       = aws_config_delivery_channel.config.arn
+  value       = aws_config_delivery_channel.config.id
 }
 
 output "config_recorder_status" {
   description = "AWS Config recorder status"
-  value       = aws_config_configuration_recorder_status.config.arn
+  value       = aws_config_configuration_recorder_status.config.id
 }
 
 output "config_role" {

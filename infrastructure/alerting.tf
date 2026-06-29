@@ -81,6 +81,20 @@ resource "aws_cloudwatch_event_target" "iam_warning_sns" {
   rule      = aws_cloudwatch_event_rule.iam_warning.name
   target_id = "send-to-sns"
   arn       = aws_sns_topic.iam_warning.arn
+
+  input_transformer {
+    input_paths = {
+      event   = "$.detail.eventName",
+      time    = "$.detail.eventTime",
+      user    = "$.detail.userIdentity.userName",
+      account = "$.detail.userIdentity.accountId",
+      source  = "$.detail.sourceIPAddress",
+      console = "$.detail.sessionCredentialFromConsole"
+    }
+    input_template = "\"ALERT: IAM changes has been detected!.\\n\\nSeverity: HIGH!. Detail:\\n\\nEvent: <event>\\nTime: <time>\\nUser: <user>\\nAccount: <account>\\nSource IP: <source>\\nStatus: <status>\\nConsole LogIn: <console>\\n\\nImmediate action required:\\n\\nPlease confirm if the <event> is legitimate. Thanks\""
+
+  }
+
 }
 
 resource "aws_sns_topic" "iam_warning" {
@@ -123,6 +137,19 @@ resource "aws_cloudwatch_event_target" "root_usage_sns" {
   rule      = aws_cloudwatch_event_rule.root_usage.name
   target_id = "send-to-sns"
   arn       = aws_sns_topic.root_usage.arn
+
+  input_transformer {
+    input_paths = {
+      event   = "$.detail.eventName",
+      time    = "$.detail.eventTime",
+      user    = "$.detail.userIdentity.userName",
+      account = "$.detail.userIdentity.accountId",
+      source  = "$.detail.sourceIPAddress",
+      console = "$.detail.sessionCredentialFromConsole"
+    }
+    input_template = "\"ALERT: Root Account usage has been detected!.\\n\\nSeverity: CRITICAL!. Detail:\\n\\nEvent: <event>\\nTime: <time>\\nUser: <user>\\nAccount: <account>\\nSource IP: <source>\\nConsole LogIn: <console>\\n\\nImmediate action required:\\n\\nPlease confirm if the <event> is legitimate. Thanks\""
+
+  }
 }
 
 resource "aws_sns_topic" "root_usage" {
@@ -178,6 +205,19 @@ resource "aws_cloudwatch_event_target" "cloudtrail_changes_sns" {
   rule      = aws_cloudwatch_event_rule.cloudtrail_changes.name
   target_id = "send-to-sns"
   arn       = aws_sns_topic.cloudtrail_changes.arn
+
+  input_transformer {
+    input_paths = {
+      event   = "$.detail.eventName",
+      time    = "$.detail.eventTime",
+      user    = "$.detail.userIdentity.userName",
+      account = "$.detail.userIdentity.accountId",
+      source  = "$.detail.sourceIPAddress",
+      console = "$.detail.sessionCredentialFromConsole"
+    }
+    input_template = "\"ALERT: CloudTrail Configuration drift has been detected!.\\n\\nSeverity: CRITICAL!. Detail:\\n\\nEvent: <event>\\nTime: <time>\\nUser: <user>\\nAccount: <account>\\nSource IP: <source>\\nConsole LogIn: <console>\\n\\nImmediate action reuired:\\n\\nPlease confirm if the <event> is legitimate. Thanks\""
+
+  }
 }
 
 resource "aws_sns_topic" "cloudtrail_changes" {
@@ -224,6 +264,19 @@ resource "aws_cloudwatch_event_target" "sg_changes_sns" {
   rule      = aws_cloudwatch_event_rule.sg_changes.name
   target_id = "send-to-sns"
   arn       = aws_sns_topic.sg_changes.arn
+
+  input_transformer {
+    input_paths = {
+      event   = "$.detail.eventName",
+      time    = "$.detail.eventTime",
+      user    = "$.detail.userIdentity.userName",
+      account = "$.detail.userIdentity.accountId",
+      source  = "$.detail.sourceIPAddress",
+      console = "$.detail.sessionCredentialFromConsole"
+    }
+    input_template = "\"ALERT: Security Group Configuration changes has been detected!.\\n\\nSeverity: HIGH!. Detail:\\n\\nEvent: <event>\\nTime: <time>\\nUser: <user>\\nAccount: <account>\\nSource IP: <source>\\nConsole LogIn: <console>\\n\\nImmediate action reuired:\\n\\nPlease confirm if the <event> is legitimate. Thanks\""
+
+  }
 }
 
 resource "aws_sns_topic" "sg_changes" {
@@ -271,6 +324,19 @@ resource "aws_cloudwatch_event_target" "console_login_no_mfa_sns" {
   rule      = aws_cloudwatch_event_rule.console_login_no_mfa.name
   target_id = "send-to-sns"
   arn       = aws_sns_topic.console_login_no_mfa.arn
+
+  input_transformer {
+    input_paths = {
+      event   = "$.detail.eventName",
+      time    = "$.detail.eventTime",
+      user    = "$.detail.userIdentity.userName",
+      account = "$.detail.userIdentity.accountId",
+      source  = "$.detail.sourceIPAddress",
+      console = "$.detail.sessionCredentialFromConsole"
+    }
+    input_template = "\"ALERT: Console LogIn without MFA has been detected!.\\n\\nSeverity: HIGH!. Detail:\\n\\nEvent: <event>\\nTime: <time>\\nUser: <user>\\nAccount: <account>\\nSource IP: <source>\\nConsole LogIn: <console>\\n\\nImmediate action reuired:\\n\\nPlease confirm if the <event> is legitimate. Thanks\""
+
+  }
 }
 
 resource "aws_sns_topic" "console_login_no_mfa" {
@@ -315,6 +381,19 @@ resource "aws_cloudwatch_event_target" "kms_key_changes_sns" {
   rule      = aws_cloudwatch_event_rule.kms_key_changes.name
   target_id = "send-to-sns"
   arn       = aws_sns_topic.kms_key_changes.arn
+
+  input_transformer {
+    input_paths = {
+      event   = "$.detail.eventName",
+      time    = "$.detail.eventTime",
+      user    = "$.detail.userIdentity.userName",
+      account = "$.detail.userIdentity.accountId",
+      source  = "$.detail.sourceIPAddress",
+      console = "$.detail.sessionCredentialFromConsole"
+    }
+    input_template = "\"ALERT: KMS key Configuration changes has been detected!.\\n\\nSeverity: HIGH!. Detail:\\n\\nEvent: <event>\\nTime: <time>\\nUser: <user>\\nAccount: <account>\\nSource IP: <source>\\nConsole LogIn: <console>\\n\\nImmediate action reuired:\\n\\nPlease confirm if the <event> is legitimate. Thanks\""
+
+  }
 }
 
 resource "aws_sns_topic" "kms_key_changes" {
@@ -363,6 +442,19 @@ resource "aws_cloudwatch_event_target" "nacl_changes_sns" {
   rule      = aws_cloudwatch_event_rule.nacl_changes.name
   target_id = "send-to-sns"
   arn       = aws_sns_topic.nacl_changes.arn
+
+  input_transformer {
+    input_paths = {
+      event   = "$.detail.eventName",
+      time    = "$.detail.eventTime",
+      user    = "$.detail.userIdentity.userName",
+      account = "$.detail.userIdentity.accountId",
+      source  = "$.detail.sourceIPAddress",
+      console = "$.detail.sessionCredentialFromConsole"
+    }
+    input_template = "\"ALERT: NACL Configuration changes has been detected!.\\n\\nSeverity: HIGH!. Detail:\\n\\nEvent: <event>\\nTime: <time>\\nUser: <user>\\nAccount: <account>\\nSource IP: <source>\\nConsole LogIn: <console>\\n\\nImmediate action reuired:\\n\\nPlease confirm if the <event> is legitimate. Thanks\""
+
+  }
 }
 
 resource "aws_sns_topic" "nacl_changes" {
