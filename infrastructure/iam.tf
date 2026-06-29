@@ -139,3 +139,80 @@ resource "aws_iam_role_policy" "flow_logs" {
   role   = aws_iam_role.flow_logs_role.id
   policy = data.aws_iam_policy_document.flow_logs_policy.json
 }
+
+# =============================================
+# IAM Roles and Policies for AWS Config
+# =============================================
+
+data "aws_iam_policy_document" "config_assume_role" {
+  statement {
+    effect = "Allow"
+
+    principals {
+      type        = "Service"
+      identifiers = ["config.amazonaws.com"]
+    }
+
+    actions = ["sts:AssumeRole"]
+  }
+}
+
+resource "aws_iam_role" "config_role" {
+  name               = "${var.project_name}-${var.environment}-config-role"
+  assume_role_policy = data.aws_iam_policy_document.config_assume_role.json
+
+  tags = {
+    Name        = "${var.project_name}-${var.environment}-config-role"
+    Environment = var.environment
+    Project     = var.project_name
+  }
+}
+
+resource "aws_iam_role_policy_attachment" "config_managed_policy" {
+  role       = aws_iam_role.config_role.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSConfigRole"
+}
+
+data "aws_iam_policy_document" "config_s3_policy" {
+  statement {
+    effect  = "Allow"
+    actions = ["s3:PutObject"]
+    resources = [
+      "${aws_s3_bucket.security_logs.arn}/config/AWSLogs/${data.aws_caller_identity.current.account_id}/Config/*"
+    ]
+    condition {
+      test     = "StringEquals"
+      variable = "s3:x-amz-acl"
+      values   = ["bucket-owner-full-control"]
+    }
+  }
+  statement {
+    effect    = "Allow"
+    actions   = ["s3:GetBucketAcl"]
+    resources = [aws_s3_bucket.security_logs.arn]
+  }
+}
+
+resource "aws_iam_role_policy" "config_s3_policy" {
+  name   = "${var.project_name}-${var.environment}-config-s3-policy"
+  role   = aws_iam_role.config_role.id
+  policy = data.aws_iam_policy_document.config_s3_policy.json
+}
+
+# KMS permission for AWS Config
+data "aws_iam_policy_document" "config_kms_policy" {
+  statement {
+    effect = "Allow"
+    actions = [
+      "kms:GenerateDataKey*",
+      "kms:Decrypt"
+    ]
+    resources = [aws_kms_key.security_logs.arn]
+  }
+}
+
+resource "aws_iam_role_policy" "config_kms_policy" {
+  name   = "${var.project_name}-${var.environment}-config-kms-policy"
+  role   = aws_iam_role.config_role.id
+  policy = data.aws_iam_policy_document.config_kms_policy.json
+}

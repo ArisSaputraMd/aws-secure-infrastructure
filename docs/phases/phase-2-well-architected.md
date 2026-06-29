@@ -3,6 +3,7 @@
 | Component     | Decision rationale                                                            |
 | ------------- | ----------------------------------------------------------------------------- |
 | VPC Flow Logs | Send logs to CloudWatch logs group, capture metadata of all traffic type IP's |
+| AWS Config    | CONTINUOUS, all resource types, shared security_logs S3 bucket, KMS CMK       |
 
 **Alerting**
 

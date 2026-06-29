@@ -18,11 +18,9 @@ resource "aws_cloudtrail" "management_events" {
 
 
 # ------------------------------------------------------------------------------
-# S3 Bucket Policy — CloudTrail Write Permissions
-# Grants CloudTrail service principal:
-#   - GetBucketAcl (pre-flight check before delivery)
-#   - PutObject    (log delivery)
-# Both statements are scoped to this trail's ARN via aws:SourceArn.
+# Security logs Bucket Policy - Central security logs
+# — CloudTrail Read (pre-flight check before delivery) and Write Permissions (log delivery)
+# - Config read and write permission
 # ------------------------------------------------------------------------------
 data "aws_region" "current" {}
 
@@ -30,7 +28,7 @@ locals {
   cloudtrail_arn = "arn:aws:cloudtrail:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:trail/${var.project_name}-${var.environment}-cloudtrail"
 }
 
-data "aws_iam_policy_document" "cloudtrail" {
+data "aws_iam_policy_document" "security_logs_policy" {
   statement {
     sid    = "AWSCloudTrailAclCheck"
     effect = "Allow"
@@ -71,6 +69,50 @@ data "aws_iam_policy_document" "cloudtrail" {
       test     = "StringEquals"
       variable = "aws:SourceArn"
       values   = [local.cloudtrail_arn]
+    }
+  }
+
+  statement {
+    sid    = "AWSConfigCheck"
+    effect = "Allow"
+
+    principals {
+      type        = "Service"
+      identifiers = ["config.amazonaws.com"]
+    }
+
+    actions   = ["s3:GetBucketAcl"]
+    resources = [aws_s3_bucket.security_logs.arn]
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [data.aws_caller_identity.current.account_id]
+    }
+  }
+
+  statement {
+    sid    = "AWSConfigWrite"
+    effect = "Allow"
+
+    principals {
+      type        = "Service"
+      identifiers = ["config.amazonaws.com"]
+    }
+
+    actions   = ["s3:PutObject"]
+    resources = ["${aws_s3_bucket.security_logs.arn}/config/AWSLogs/${data.aws_caller_identity.current.account_id}/Config/*"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "s3:x-amz-acl"
+      values   = ["bucket-owner-full-control"]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [data.aws_caller_identity.current.account_id]
     }
   }
 }
@@ -124,8 +166,7 @@ data "aws_iam_policy_document" "kms_policy" {
   }
 
   # CloudTrail: only the actions actually needed for log delivery.
-  # EncryptionContext condition scopes this to CloudTrail ARNs in this account only —
-  # prevents other services from using this key under the CloudTrail principal.
+  # EncryptionContext condition scopes this to CloudTrail ARNs in this account only 
   statement {
     sid    = "EnableCloudTrailPermissions"
     effect = "Allow"
@@ -144,6 +185,28 @@ data "aws_iam_policy_document" "kms_policy" {
       values   = ["arn:aws:cloudtrail:*:${data.aws_caller_identity.current.account_id}:trail/*"]
     }
   }
+
+  #AWS Configs 
+  statement {
+    sid    = "EnableConfigPermissions"
+    effect = "Allow"
+    principals {
+      type        = "Service"
+      identifiers = ["config.amazonaws.com"]
+    }
+    actions = [
+      "kms:GenerateDataKey*",
+      "kms:Decrypt",
+    ]
+    resources = ["*"]
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [data.aws_caller_identity.current.account_id]
+    }
+  }
+
+
 }
 
 resource "aws_kms_key_policy" "security_logs" {
@@ -233,9 +296,9 @@ resource "aws_s3_bucket_public_access_block" "security_logs" {
 # Bucket Policy — CloudTrail write permissions
 # ------------------------------------------------------------------------------
 resource "aws_s3_bucket_policy" "security_logs_policy" {
-  depends_on = [data.aws_iam_policy_document.cloudtrail]
+  depends_on = [data.aws_iam_policy_document.security_logs_policy]
   bucket     = aws_s3_bucket.security_logs.id
-  policy     = data.aws_iam_policy_document.cloudtrail.json
+  policy     = data.aws_iam_policy_document.security_logs_policy.json
 }
 
 
