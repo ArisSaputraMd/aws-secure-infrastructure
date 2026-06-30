@@ -25,10 +25,10 @@ data "aws_ssm_parameter" "root_owner_email" {
 
 
 # -----------------------------------------------------------------
-# Shared: SNS publish policy for EventBridge
+# Shared: SNS publish policies
 # -----------------------------------------------------------------
 
-data "aws_iam_policy_document" "sns_topic_policy" {
+data "aws_iam_policy_document" "sns_topic_cloudtrail_changes" {
   statement {
     effect  = "Allow"
     actions = ["SNS:Publish"]
@@ -39,17 +39,108 @@ data "aws_iam_policy_document" "sns_topic_policy" {
     }
 
     resources = [
-      aws_sns_topic.cloudtrail_changes.arn,
-      aws_sns_topic.console_login_no_mfa.arn,
-      aws_sns_topic.iam_warning.arn,
-      aws_sns_topic.kms_key_changes.arn,
-      aws_sns_topic.root_usage.arn,
-      aws_sns_topic.nacl_changes.arn,
-      aws_sns_topic.sg_changes.arn
+      aws_sns_topic.cloudtrail_changes.arn
     ]
   }
 }
 
+data "aws_iam_policy_document" "sns_topic_console_login_no_mfa" {
+  statement {
+    effect  = "Allow"
+    actions = ["SNS:Publish"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["events.amazonaws.com"]
+    }
+
+    resources = [
+      aws_sns_topic.console_login_no_mfa.arn
+    ]
+  }
+}
+
+data "aws_iam_policy_document" "sns_topic_iam_warning" {
+  statement {
+    effect  = "Allow"
+    actions = ["SNS:Publish"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["events.amazonaws.com"]
+    }
+
+    resources = [
+      aws_sns_topic.iam_warning.arn
+    ]
+  }
+}
+
+data "aws_iam_policy_document" "sns_topic_kms_key_changes" {
+  statement {
+    effect  = "Allow"
+    actions = ["SNS:Publish"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["events.amazonaws.com"]
+    }
+
+    resources = [
+      aws_sns_topic.kms_key_changes.arn
+    ]
+  }
+}
+
+data "aws_iam_policy_document" "sns_topic_root_usage" {
+  statement {
+    effect  = "Allow"
+    actions = ["SNS:Publish"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["events.amazonaws.com"]
+    }
+
+    resources = [
+      aws_sns_topic.root_usage.arn
+    ]
+  }
+}
+
+data "aws_iam_policy_document" "sns_topic_nacl_changes" {
+  statement {
+    effect  = "Allow"
+    actions = ["SNS:Publish"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["events.amazonaws.com"]
+    }
+
+    resources = [
+      aws_sns_topic.nacl_changes.arn
+
+    ]
+  }
+}
+
+data "aws_iam_policy_document" "sns_topic_sg_changes" {
+  statement {
+    effect  = "Allow"
+    actions = ["SNS:Publish"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["events.amazonaws.com"]
+    }
+
+    resources = [
+      aws_sns_topic.sg_changes.arn
+
+    ]
+  }
+}
 # -----------------------------------------------------------------
 # rule 1: IAM privilege escalation — CIS 4.4 / 4.6
 # Indicates a user or role is being granted elevated permissions.
@@ -91,7 +182,7 @@ resource "aws_cloudwatch_event_target" "iam_warning_sns" {
       source  = "$.detail.sourceIPAddress",
       console = "$.detail.sessionCredentialFromConsole"
     }
-    input_template = "\"ALERT: IAM changes has been detected!.\\n\\nSeverity: HIGH!. Detail:\\n\\nEvent: <event>\\nTime: <time>\\nUser: <user>\\nAccount: <account>\\nSource IP: <source>\\nStatus: <status>\\nConsole LogIn: <console>\\n\\nImmediate action required:\\n\\nPlease confirm if the <event> is legitimate. Thanks\""
+    input_template = "\"ALERT: IAM changes has been detected!.\\n\\nSeverity: HIGH!. Detail:\\n\\nEvent: <event>\\nTime: <time>\\nUser: <user>\\nAccount: <account>\\nSource IP: <source>\\nConsole LogIn: <console>\\n\\nImmediate action required:\\n\\nPlease confirm if the <event> is legitimate. Thanks\""
 
   }
 
@@ -103,7 +194,7 @@ resource "aws_sns_topic" "iam_warning" {
 
 resource "aws_sns_topic_policy" "iam_warning" {
   arn    = aws_sns_topic.iam_warning.arn
-  policy = data.aws_iam_policy_document.sns_topic_policy.json
+  policy = data.aws_iam_policy_document.sns_topic_iam_warning.json
 }
 
 resource "aws_sns_topic_subscription" "iam_warning_security" {
@@ -158,7 +249,7 @@ resource "aws_sns_topic" "root_usage" {
 
 resource "aws_sns_topic_policy" "root_usage" {
   arn    = aws_sns_topic.root_usage.arn
-  policy = data.aws_iam_policy_document.sns_topic_policy.json
+  policy = data.aws_iam_policy_document.sns_topic_root_usage.json
 }
 
 # Security team gets all alerts
@@ -226,7 +317,7 @@ resource "aws_sns_topic" "cloudtrail_changes" {
 
 resource "aws_sns_topic_policy" "cloudtrail_changes" {
   arn    = aws_sns_topic.cloudtrail_changes.arn
-  policy = data.aws_iam_policy_document.sns_topic_policy.json
+  policy = data.aws_iam_policy_document.sns_topic_cloudtrail_changes.json
 }
 
 resource "aws_sns_topic_subscription" "cloudtrail_changes_security" {
@@ -285,7 +376,7 @@ resource "aws_sns_topic" "sg_changes" {
 
 resource "aws_sns_topic_policy" "sg_changes" {
   arn    = aws_sns_topic.sg_changes.arn
-  policy = data.aws_iam_policy_document.sns_topic_policy.json
+  policy = data.aws_iam_policy_document.sns_topic_sg_changes.json
 }
 
 resource "aws_sns_topic_subscription" "sg_changes_security" {
@@ -345,7 +436,7 @@ resource "aws_sns_topic" "console_login_no_mfa" {
 
 resource "aws_sns_topic_policy" "console_login_no_mfa" {
   arn    = aws_sns_topic.console_login_no_mfa.arn
-  policy = data.aws_iam_policy_document.sns_topic_policy.json
+  policy = data.aws_iam_policy_document.sns_topic_console_login_no_mfa.json
 }
 
 resource "aws_sns_topic_subscription" "console_login_no_mfa_security" {
@@ -402,7 +493,7 @@ resource "aws_sns_topic" "kms_key_changes" {
 
 resource "aws_sns_topic_policy" "kms_key_changes" {
   arn    = aws_sns_topic.kms_key_changes.arn
-  policy = data.aws_iam_policy_document.sns_topic_policy.json
+  policy = data.aws_iam_policy_document.sns_topic_kms_key_changes.json
 }
 
 resource "aws_sns_topic_subscription" "kms_key_changes_security" {
@@ -463,7 +554,7 @@ resource "aws_sns_topic" "nacl_changes" {
 
 resource "aws_sns_topic_policy" "nacl_changes" {
   arn    = aws_sns_topic.nacl_changes.arn
-  policy = data.aws_iam_policy_document.sns_topic_policy.json
+  policy = data.aws_iam_policy_document.sns_topic_nacl_changes.json
 }
 
 resource "aws_sns_topic_subscription" "nacl_changes_security" {

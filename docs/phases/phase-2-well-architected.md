@@ -1,9 +1,17 @@
 ### Components delivered
 
-| Component     | Decision rationale                                                            |
-| ------------- | ----------------------------------------------------------------------------- |
-| VPC Flow Logs | Send logs to CloudWatch logs group, capture metadata of all traffic type IP's |
-| AWS Config    | CONTINUOUS, all resource types, shared security_logs S3 bucket, KMS CMK       |
+| Component                      | Decision rationale                                                                                                                           |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| VPC Flow Logs                  | Send logs to CloudWatch logs group, capture metadata of all traffic type IP's                                                                |
+| AWS Config                     | CONTINUOUS, all resource types, shared security_logs S3 bucket, KMS CMK                                                                      |
+| AWS GuardDuty                  | Consume metadata from VPC Flow Logs, Detect anomaly and threat                                                                               |
+| AWS SecurityHub                | Classic CSPM + SecurityHub v2, foundational-security-best-practices/v/1.0.0, cis-aws-foundations-benchmark/v/5.0.0, product/aws/guardduty    |
+| CloudTrail + S3 (`logs`) + KMS | Multi-region management event capture; S3 with COMPLIANCE object lock, SSE-KMS with CMK, lifecycle tiering to IA → Glacier IR → Deep Archive |
+| EventBridge + SNS              | Capture violated CloudTrail event against CIS Benchmark V5.0, route to SNS Topics for notification                                           |
+
+```note
+GuardDuty and Security Hub deferred due to AWS Business Support tier requirement on free-tier accounts, to be enabled when upgraded
+```
 
 **Alerting**
 

@@ -11,7 +11,7 @@ resource "aws_config_delivery_channel" "config" {
 
   name           = "${var.project_name}-${var.environment}-config"
   s3_bucket_name = aws_s3_bucket.security_logs.bucket
-  s3_key_prefix  = "config/"
+  s3_key_prefix  = "config"
   s3_kms_key_arn = aws_kms_key.security_logs.arn
 
 }
