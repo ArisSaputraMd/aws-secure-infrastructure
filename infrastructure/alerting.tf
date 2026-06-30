@@ -141,6 +141,24 @@ data "aws_iam_policy_document" "sns_topic_sg_changes" {
     ]
   }
 }
+
+data "aws_iam_policy_document" "securityhub_findings" {
+  statement {
+    effect  = "Allow"
+    actions = ["SNS:Publish"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["events.amazonaws.com"]
+    }
+
+    resources = [
+      aws_sns_topic.securityhub_findings.arn
+
+    ]
+  }
+}
+
 # -----------------------------------------------------------------
 # rule 1: IAM privilege escalation — CIS 4.4 / 4.6
 # Indicates a user or role is being granted elevated permissions.
@@ -182,8 +200,18 @@ resource "aws_cloudwatch_event_target" "iam_warning_sns" {
       source  = "$.detail.sourceIPAddress",
       console = "$.detail.sessionCredentialFromConsole"
     }
-    input_template = "\"ALERT: IAM changes has been detected!.\\n\\nSeverity: HIGH!. Detail:\\n\\nEvent: <event>\\nTime: <time>\\nUser: <user>\\nAccount: <account>\\nSource IP: <source>\\nConsole LogIn: <console>\\n\\nImmediate action required:\\n\\nPlease confirm if the <event> is legitimate. Thanks\""
+    input_template = jsonencode(<<EOF
+ALERT: Suspecious IAM Action detected!.
 
+Severity: CRITICAL
+Event: <event>
+Time: <time>
+User Name : <user>
+Account : <account>
+IP Address : <source>
+Console LogIn: <console>
+EOF
+    )
   }
 
 }
@@ -238,8 +266,18 @@ resource "aws_cloudwatch_event_target" "root_usage_sns" {
       source  = "$.detail.sourceIPAddress",
       console = "$.detail.sessionCredentialFromConsole"
     }
-    input_template = "\"ALERT: Root Account usage has been detected!.\\n\\nSeverity: CRITICAL!. Detail:\\n\\nEvent: <event>\\nTime: <time>\\nUser: <user>\\nAccount: <account>\\nSource IP: <source>\\nConsole LogIn: <console>\\n\\nImmediate action required:\\n\\nPlease confirm if the <event> is legitimate. Thanks\""
+    input_template = jsonencode(<<EOF
+ALERT: Root Account ussage detected!.
 
+Severity: CRITICAL
+Event: <event>
+Time: <time>
+User Name : <user>
+Account : <account>
+IP Address : <source>
+Console LogIn: <console>
+EOF
+    )
   }
 }
 
@@ -306,8 +344,18 @@ resource "aws_cloudwatch_event_target" "cloudtrail_changes_sns" {
       source  = "$.detail.sourceIPAddress",
       console = "$.detail.sessionCredentialFromConsole"
     }
-    input_template = "\"ALERT: CloudTrail Configuration drift has been detected!.\\n\\nSeverity: CRITICAL!. Detail:\\n\\nEvent: <event>\\nTime: <time>\\nUser: <user>\\nAccount: <account>\\nSource IP: <source>\\nConsole LogIn: <console>\\n\\nImmediate action reuired:\\n\\nPlease confirm if the <event> is legitimate. Thanks\""
+    input_template = jsonencode(<<EOF
+ALERT: Attempts to disable or modify CloudTrail audit logging detected!.
 
+Severity: CRITICAL
+Event: <event>
+Time: <time>
+User Name : <user>
+Account : <account>
+IP Address : <source>
+Console LogIn: <console>
+EOF
+    )
   }
 }
 
@@ -365,8 +413,18 @@ resource "aws_cloudwatch_event_target" "sg_changes_sns" {
       source  = "$.detail.sourceIPAddress",
       console = "$.detail.sessionCredentialFromConsole"
     }
-    input_template = "\"ALERT: Security Group Configuration changes has been detected!.\\n\\nSeverity: HIGH!. Detail:\\n\\nEvent: <event>\\nTime: <time>\\nUser: <user>\\nAccount: <account>\\nSource IP: <source>\\nConsole LogIn: <console>\\n\\nImmediate action reuired:\\n\\nPlease confirm if the <event> is legitimate. Thanks\""
+    input_template = jsonencode(<<EOF
+ALERT: Security Group modification detected!.
 
+Severity: HIGH
+Event: <event>
+Time: <time>
+User Name : <user>
+Account : <account>
+IP Address : <source>
+Console LogIn: <console>
+EOF
+    )
   }
 }
 
@@ -425,8 +483,18 @@ resource "aws_cloudwatch_event_target" "console_login_no_mfa_sns" {
       source  = "$.detail.sourceIPAddress",
       console = "$.detail.sessionCredentialFromConsole"
     }
-    input_template = "\"ALERT: Console LogIn without MFA has been detected!.\\n\\nSeverity: HIGH!. Detail:\\n\\nEvent: <event>\\nTime: <time>\\nUser: <user>\\nAccount: <account>\\nSource IP: <source>\\nConsole LogIn: <console>\\n\\nImmediate action reuired:\\n\\nPlease confirm if the <event> is legitimate. Thanks\""
+    input_template = jsonencode(<<EOF
+ALERT: Successful AWS console logins without MFA detected!.
 
+Severity: HIGH
+Event: <event>
+Time: <time>
+User Name : <user>
+Account : <account>
+IP Address : <source>
+Console LogIn: <console>
+EOF
+    )
   }
 }
 
@@ -482,8 +550,18 @@ resource "aws_cloudwatch_event_target" "kms_key_changes_sns" {
       source  = "$.detail.sourceIPAddress",
       console = "$.detail.sessionCredentialFromConsole"
     }
-    input_template = "\"ALERT: KMS key Configuration changes has been detected!.\\n\\nSeverity: HIGH!. Detail:\\n\\nEvent: <event>\\nTime: <time>\\nUser: <user>\\nAccount: <account>\\nSource IP: <source>\\nConsole LogIn: <console>\\n\\nImmediate action reuired:\\n\\nPlease confirm if the <event> is legitimate. Thanks\""
+    input_template = jsonencode(<<EOF
+ALERT: KMS key deletion detected!.
 
+Severity: CRITICAL
+Event: <event>
+Time: <time>
+User Name : <user>
+Account : <account>
+IP Address : <source>
+Console LogIn: <console>
+EOF
+    )
   }
 }
 
@@ -543,8 +621,18 @@ resource "aws_cloudwatch_event_target" "nacl_changes_sns" {
       source  = "$.detail.sourceIPAddress",
       console = "$.detail.sessionCredentialFromConsole"
     }
-    input_template = "\"ALERT: NACL Configuration changes has been detected!.\\n\\nSeverity: HIGH!. Detail:\\n\\nEvent: <event>\\nTime: <time>\\nUser: <user>\\nAccount: <account>\\nSource IP: <source>\\nConsole LogIn: <console>\\n\\nImmediate action reuired:\\n\\nPlease confirm if the <event> is legitimate. Thanks\""
+    input_template = jsonencode(<<EOF
+ALERT: NACL Changes detected!.
 
+Severity: HIGH
+Event: <event>
+Time: <time>
+User Name : <user>
+Account : <account>
+IP Address : <source>
+Console LogIn: <console>
+EOF
+    )
   }
 }
 
@@ -559,6 +647,87 @@ resource "aws_sns_topic_policy" "nacl_changes" {
 
 resource "aws_sns_topic_subscription" "nacl_changes_security" {
   topic_arn = aws_sns_topic.nacl_changes.arn
+  protocol  = "email"
+  endpoint  = data.aws_ssm_parameter.security_email.value
+}
+
+
+# -----------------------------------------------------------------
+# rule 8: SecurityHub Findings
+# generic rule pattern for guardduty, iam accessanalyzer and config
+# -----------------------------------------------------------------
+
+
+resource "aws_cloudwatch_event_rule" "securityhub_findings" {
+  name        = "securityhub_findings"
+  description = "Detect SecurityHub CRITICAL/HIGH findings"
+
+  event_pattern = jsonencode({
+    "source" : ["aws.securityhub"],
+    "detail-type" : ["Security Hub Findings - Imported"],
+    "detail" : {
+      "findings" : {
+        "Severity" : {
+          "Label" : ["HIGH", "CRITICAL"]
+        },
+        "Workflow" : {
+          "Status" : [
+            "NEW"
+          ]
+        }
+      }
+    }
+  })
+}
+
+
+resource "aws_cloudwatch_event_target" "securityhub_findings_sns" {
+  rule      = aws_cloudwatch_event_rule.securityhub_findings.name
+  target_id = "send-to-sns"
+  arn       = aws_sns_topic.securityhub_findings.arn
+
+  input_transformer {
+    input_paths = {
+      title       = "$.detail.findings[0].Title",
+      description = "$.detail.findings[0].Description",
+      severity    = "$.detail.findings[0].Severity.Label",
+      product     = "$.detail.findings[0].ProductName",
+      resource    = "$.detail.findings[0].Resources[0].Id",
+      types       = "$.detail.findings[0].Types",
+      time        = "$.time"
+    }
+    input_template = jsonencode(<<EOF
+ALERT: Security Hub finding detected!.
+
+Title: <title>
+Severity: <severity>
+Product: <product>
+Time: <time>
+
+Description:
+<description>
+
+Resource:
+<resource>
+
+Finding Type:
+<types>"
+EOF
+    )
+  }
+}
+
+resource "aws_sns_topic" "securityhub_findings" {
+  name = "securityhub_findings"
+}
+
+resource "aws_sns_topic_policy" "securityhub_findings" {
+  arn    = aws_sns_topic.securityhub_findings.arn
+  policy = data.aws_iam_policy_document.securityhub_findings.json
+}
+
+resource "aws_sns_topic_subscription" "securityhub_findings" {
+  topic_arn = aws_sns_topic.securityhub_findings.arn
   protocol  = "email"
   endpoint  = data.aws_ssm_parameter.security_email.value
 }
