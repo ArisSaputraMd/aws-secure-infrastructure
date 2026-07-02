@@ -7,9 +7,8 @@ resource "aws_cloudwatch_log_group" "ecs" {
   retention_in_days = 30
 
   tags = {
-    Name        = "${var.project_name}-${var.environment}-ecs-logs"
-    Environment = var.environment
-    Project     = var.project_name
+    Name               = "${var.project_name}-${var.environment}-ecs-logs"
+    DataClassification = "internal"
   }
 }
 
@@ -18,9 +17,7 @@ resource "aws_ecs_cluster" "main" {
   name = "${var.project_name}-${var.environment}-cluster"
 
   tags = {
-    Name        = "${var.project_name}-${var.environment}-cluster"
-    Environment = var.environment
-    Project     = var.project_name
+    Name = "${var.project_name}-${var.environment}-cluster"
   }
 }
 
@@ -91,9 +88,7 @@ resource "aws_ecs_task_definition" "mattermost" {
   ])
 
   tags = {
-    Name        = "${var.project_name}-${var.environment}-mattermost-task"
-    Environment = var.environment
-    Project     = var.project_name
+    Name = "${var.project_name}-${var.environment}-mattermost-task"
   }
 }
 
@@ -120,8 +115,6 @@ resource "aws_ecs_service" "mattermost" {
   depends_on = [aws_lb_listener.https]
 
   tags = {
-    Name        = "${var.project_name}-${var.environment}-mattermost-service"
-    Environment = var.environment
-    Project     = var.project_name
+    Name = "${var.project_name}-${var.environment}-mattermost-service"
   }
 }

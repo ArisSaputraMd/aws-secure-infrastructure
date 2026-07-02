@@ -1,6 +1,5 @@
 # =============================================
 # Security Alerting — EventBridge + SNS
-# Based on CIS AWS Foundations Benchmark
 # =============================================
 #
 # Alert routing:

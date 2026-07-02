@@ -14,7 +14,7 @@ output "private_subnet_ids" {
 }
 output "alb_dns_name" {
   description = "ALB DNS name"
-  value       = aws_lb.frontend.dns_name
+  value       = aws_lb.application_load_balancer.dns_name
 }
 
 output "mattermost_url" {

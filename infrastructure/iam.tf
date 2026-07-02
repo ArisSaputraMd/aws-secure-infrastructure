@@ -48,9 +48,7 @@ resource "aws_iam_role" "ecs_task_execution_role" {
   assume_role_policy = data.aws_iam_policy_document.ecs_assume_role_policy.json
 
   tags = {
-    Name        = "${var.project_name}-${var.environment}-ecs-execution-role"
-    Environment = var.environment
-    Project     = var.project_name
+    Name = "${var.project_name}-${var.environment}-ecs-execution-role"
   }
 }
 
@@ -74,9 +72,7 @@ resource "aws_iam_role" "ecs_task_role" {
   name               = "${var.project_name}-${var.environment}-ecs-task-role"
   assume_role_policy = data.aws_iam_policy_document.ecs_assume_role_policy.json
   tags = {
-    Name        = "${var.project_name}-${var.environment}-ecs-task-role"
-    Environment = var.environment
-    Project     = var.project_name
+    Name = "${var.project_name}-${var.environment}-ecs-task-role"
   }
 }
 
@@ -109,9 +105,7 @@ resource "aws_iam_role" "flow_logs_role" {
   assume_role_policy = data.aws_iam_policy_document.flow_logs_assume_role.json
 
   tags = {
-    Name        = "${var.project_name}-${var.environment}-flow-logs-role"
-    Environment = var.environment
-    Project     = var.project_name
+    Name = "${var.project_name}-${var.environment}-flow-logs-role"
   }
 }
 
@@ -162,9 +156,7 @@ resource "aws_iam_role" "config_role" {
   assume_role_policy = data.aws_iam_policy_document.config_assume_role.json
 
   tags = {
-    Name        = "${var.project_name}-${var.environment}-config-role"
-    Environment = var.environment
-    Project     = var.project_name
+    Name = "${var.project_name}-${var.environment}-config-role"
   }
 }
 

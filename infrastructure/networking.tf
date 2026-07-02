@@ -14,9 +14,7 @@ resource "aws_vpc" "main" {
   enable_dns_support   = true
 
   tags = {
-    Name        = "${var.project_name}-${var.environment}-vpc"
-    Environment = var.environment
-    Project     = var.project_name
+    Name = "${var.project_name}-${var.environment}-vpc"
   }
 }
 
@@ -25,9 +23,7 @@ resource "aws_internet_gateway" "main" {
   vpc_id = aws_vpc.main.id
 
   tags = {
-    Name        = "${var.project_name}-${var.environment}-igw"
-    Environment = var.environment
-    Project     = var.project_name
+    Name = "${var.project_name}-${var.environment}-igw"
   }
 }
 
@@ -41,10 +37,8 @@ resource "aws_subnet" "public" {
   map_public_ip_on_launch = true
 
   tags = {
-    Name        = "${var.project_name}-${var.environment}-public-${local.azs[count.index]}"
-    Environment = var.environment
-    Project     = var.project_name
-    Tier        = "public"
+    Name = "${var.project_name}-${var.environment}-public-${local.azs[count.index]}"
+    Tier = "public"
   }
 }
 
@@ -56,10 +50,8 @@ resource "aws_subnet" "private" {
   availability_zone = local.azs[count.index]
 
   tags = {
-    Name        = "${var.project_name}-${var.environment}-private-${local.azs[count.index]}"
-    Environment = var.environment
-    Project     = var.project_name
-    Tier        = "private"
+    Name = "${var.project_name}-${var.environment}-private-${local.azs[count.index]}"
+    Tier = "private"
   }
 }
 
@@ -73,9 +65,7 @@ resource "aws_route_table" "public" {
   }
 
   tags = {
-    Name        = "${var.project_name}-${var.environment}-public-rt"
-    Environment = var.environment
-    Project     = var.project_name
+    Name = "${var.project_name}-${var.environment}-public-rt"
   }
 }
 
@@ -91,9 +81,7 @@ resource "aws_route_table" "private" {
   vpc_id = aws_vpc.main.id
 
   tags = {
-    Name        = "${var.project_name}-${var.environment}-private-rt"
-    Environment = var.environment
-    Project     = var.project_name
+    Name = "${var.project_name}-${var.environment}-private-rt"
   }
 }
 
@@ -112,9 +100,7 @@ resource "aws_vpc_endpoint" "s3" {
   route_table_ids   = [aws_route_table.private.id]
 
   tags = {
-    Name        = "${var.project_name}-${var.environment}-endpoint-s3"
-    Environment = var.environment
-    Project     = var.project_name
+    Name = "${var.project_name}-${var.environment}-endpoint-s3"
   }
 }
 
@@ -128,9 +114,7 @@ resource "aws_vpc_endpoint" "ecr_api" {
   private_dns_enabled = true
 
   tags = {
-    Name        = "${var.project_name}-${var.environment}-endpoint-ecr-api"
-    Environment = var.environment
-    Project     = var.project_name
+    Name = "${var.project_name}-${var.environment}-endpoint-ecr-api"
   }
 }
 
@@ -144,9 +128,7 @@ resource "aws_vpc_endpoint" "ecr_dkr" {
   private_dns_enabled = true
 
   tags = {
-    Name        = "${var.project_name}-${var.environment}-endpoint-ecr-dkr"
-    Environment = var.environment
-    Project     = var.project_name
+    Name = "${var.project_name}-${var.environment}-endpoint-ecr-dkr"
   }
 }
 
@@ -160,9 +142,7 @@ resource "aws_vpc_endpoint" "cloudwatch_logs" {
   private_dns_enabled = true
 
   tags = {
-    Name        = "${var.project_name}-${var.environment}-endpoint-logs"
-    Environment = var.environment
-    Project     = var.project_name
+    Name = "${var.project_name}-${var.environment}-endpoint-logs"
   }
 }
 
@@ -191,9 +171,7 @@ resource "aws_security_group" "vpc_endpoints" {
   vpc_id      = aws_vpc.main.id
 
   tags = {
-    Name        = "${var.project_name}-${var.environment}-vpc-endpoints-sg"
-    Environment = var.environment
-    Project     = var.project_name
+    Name = "${var.project_name}-${var.environment}-vpc-endpoints-sg"
   }
 }
 resource "aws_vpc_security_group_ingress_rule" "vpc_endpoints_ingress" {
@@ -213,9 +191,7 @@ resource "aws_security_group" "alb" {
   vpc_id      = aws_vpc.main.id
 
   tags = {
-    Name        = "${var.project_name}-${var.environment}-alb-sg"
-    Environment = var.environment
-    Project     = var.project_name
+    Name = "${var.project_name}-${var.environment}-alb-sg"
   }
 }
 
@@ -261,9 +237,7 @@ resource "aws_security_group" "ecs" {
   vpc_id      = aws_vpc.main.id
 
   tags = {
-    Name        = "${var.project_name}-${var.environment}-ecs-sg"
-    Environment = var.environment
-    Project     = var.project_name
+    Name = "${var.project_name}-${var.environment}-ecs-sg"
   }
 }
 
@@ -311,9 +285,7 @@ resource "aws_security_group" "rds" {
   vpc_id      = aws_vpc.main.id
 
   tags = {
-    Name        = "${var.project_name}-${var.environment}-rds-sg"
-    Environment = var.environment
-    Project     = var.project_name
+    Name = "${var.project_name}-${var.environment}-rds-sg"
   }
 }
 
@@ -344,8 +316,6 @@ resource "aws_cloudwatch_log_group" "vpc" {
   retention_in_days = 30
 
   tags = {
-    Name        = "${var.project_name}-${var.environment}-vpc-logs"
-    Environment = var.environment
-    Project     = var.project_name
+    Name = "${var.project_name}-${var.environment}-vpc-logs"
   }
 }

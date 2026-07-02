@@ -16,8 +16,6 @@ resource "aws_ssm_parameter" "db_dsn" {
   overwrite = true
 
   tags = {
-    Name        = "${var.project_name}-${var.environment}-db-dsn"
-    Environment = var.environment
-    Project     = var.project_name
+    Name = "${var.project_name}-${var.environment}-db-dsn"
   }
 }

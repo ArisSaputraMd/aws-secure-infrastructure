@@ -17,9 +17,7 @@ resource "aws_kms_key" "mattermost_files" {
   enable_key_rotation     = true
 
   tags = {
-    Name        = "${var.project_name}-${var.environment}-mattermost-files-key"
-    Environment = var.environment
-    Project     = var.project_name
+    Name = "${var.project_name}-${var.environment}-mattermost-files-key"
   }
 }
 
@@ -76,9 +74,8 @@ resource "aws_s3_bucket" "mattermost_files" {
   force_destroy = var.mattermost_files_force_destroy
 
   tags = {
-    Name        = "${var.project_name}-${var.environment}-mattermost-files"
-    Environment = var.environment
-    Project     = var.project_name
+    Name               = "${var.project_name}-${var.environment}-mattermost-files"
+    DataClassification = "Confidential"
   }
 }
 
@@ -205,8 +202,4 @@ resource "aws_s3_bucket_lifecycle_configuration" "mattermost_files_versions" {
     }
   }
 }
-
-# ------------------------------------------------------------------------------
-# update ecs environment
-# ------------------------------------------------------------------------------
 

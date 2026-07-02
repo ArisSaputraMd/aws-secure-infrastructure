@@ -135,9 +135,7 @@ resource "aws_kms_key" "security_logs" {
   enable_key_rotation     = true
 
   tags = {
-    Name        = "${var.project_name}-${var.environment}-security-logs-key"
-    Environment = var.environment
-    Project     = var.project_name
+    Name = "${var.project_name}-${var.environment}-security-logs-key"
   }
 }
 
@@ -239,9 +237,8 @@ resource "aws_s3_bucket" "security_logs" {
   object_lock_enabled = var.logs_bucket_object_lock
 
   tags = {
-    Name        = "${var.project_name}-${var.environment}-security-logs"
-    Environment = var.environment
-    Project     = var.project_name
+    Name               = "${var.project_name}-${var.environment}-security-logs"
+    DataClassification = "Restricted"
   }
 }
 

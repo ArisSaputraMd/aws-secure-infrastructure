@@ -93,3 +93,60 @@ variable "environment" {
   type        = string
   default     = "dev"
 }
+
+variable "owner" {
+  description = "Owner of the resources"
+  type        = string
+  default     = "arissaputra"
+
+  validation {
+    condition = contains(
+      [
+        "arissaputra",
+        "security-team",
+        "devops-team"
+      ],
+      var.owner
+    )
+    error_message = "Allowed values: arissaputra, security-team, devops-team."
+  }
+}
+
+variable "managed_by" {
+  description = "Entity responsible for managing the resources"
+  type        = string
+  default     = "Terraform"
+
+  validation {
+    condition = contains(
+      [
+        "Terraform",
+        "CloudFormation",
+        "Manual"
+      ],
+      var.managed_by
+    )
+    error_message = "Allowed values: Terraform, CloudFormation, Manual."
+  }
+}
+
+
+variable "data_classification" {
+  description = "Classification level of the data handled by the resources"
+  type        = string
+  default     = "internal"
+
+  validation {
+    condition = contains(
+      [
+        "public",
+        "internal",
+        "confidential",
+        "restricted"
+      ],
+      var.data_classification
+    )
+
+    error_message = "Allowed values: public, internal, confidential, restricted."
+  }
+}

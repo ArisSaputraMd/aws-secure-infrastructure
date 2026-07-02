@@ -8,9 +8,7 @@ resource "aws_db_subnet_group" "primary" {
   subnet_ids = aws_subnet.private[*].id
 
   tags = {
-    Name        = "${var.project_name}-${var.environment}-db-subnet-group"
-    Environment = var.environment
-    Project     = var.project_name
+    Name = "${var.project_name}-${var.environment}-db-subnet-group"
   }
 }
 
@@ -38,8 +36,7 @@ resource "aws_db_instance" "primary" {
   skip_final_snapshot = true
 
   tags = {
-    Name        = "${var.project_name}-${var.environment}-db"
-    Environment = var.environment
-    Project     = var.project_name
+    Name               = "${var.project_name}-${var.environment}-db"
+    DataClassification = "Confidential"
   }
 }

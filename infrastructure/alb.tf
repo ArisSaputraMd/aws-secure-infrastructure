@@ -3,7 +3,7 @@
 # =============================================
 
 # Application Load Balancer — public facing
-resource "aws_lb" "frontend" {
+resource "aws_lb" "application_load_balancer" {
   name               = "${var.project_name}-${var.environment}-alb"
   internal           = false
   load_balancer_type = "application"
@@ -11,9 +11,7 @@ resource "aws_lb" "frontend" {
   subnets            = aws_subnet.public[*].id
 
   tags = {
-    Name        = "${var.project_name}-${var.environment}-alb"
-    Environment = var.environment
-    Project     = var.project_name
+    Name = "${var.project_name}-${var.environment}-alb"
   }
 }
 
@@ -35,15 +33,13 @@ resource "aws_lb_target_group" "ecs" {
   }
 
   tags = {
-    Name        = "${var.project_name}-${var.environment}-ecs-tg"
-    Environment = var.environment
-    Project     = var.project_name
+    Name = "${var.project_name}-${var.environment}-ecs-tg"
   }
 }
 
 # HTTP Listener — redirects all HTTP traffic to HTTPS
 resource "aws_lb_listener" "http" {
-  load_balancer_arn = aws_lb.frontend.arn
+  load_balancer_arn = aws_lb.application_load_balancer.arn
   port              = 80
   protocol          = "HTTP"
 
@@ -57,15 +53,13 @@ resource "aws_lb_listener" "http" {
   }
 
   tags = {
-    Name        = "${var.project_name}-${var.environment}-http-listener"
-    Environment = var.environment
-    Project     = var.project_name
+    Name = "${var.project_name}-${var.environment}-http-listener"
   }
 }
 
 # HTTPS Listener — forwards traffic to ECS target group
 resource "aws_lb_listener" "https" {
-  load_balancer_arn = aws_lb.frontend.arn
+  load_balancer_arn = aws_lb.application_load_balancer.arn
   port              = 443
   protocol          = "HTTPS"
   ssl_policy        = "ELBSecurityPolicy-TLS13-1-2-2021-06"
@@ -77,8 +71,6 @@ resource "aws_lb_listener" "https" {
   }
 
   tags = {
-    Name        = "${var.project_name}-${var.environment}-https-listener"
-    Environment = var.environment
-    Project     = var.project_name
+    Name = "${var.project_name}-${var.environment}-https-listener"
   }
 }
