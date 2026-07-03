@@ -42,27 +42,27 @@ Infrastructure was validated before Phase 1 was marked complete:
 
 - `terraform validate` passes
 
-![terraform validation](../assets/terraform-success-validation.png)
+![terraform validation](../../assets/terraform-success-validation.png)
 
 - `terraform plan` completes with no errors and no unexpected diffs
 
-![terraform plan](../assets/terraform-plan-p1.png)
+![terraform plan](../../assets/terraform-plan-p1.png)
 
 - `terraform apply` completed
 
-![terraform apply](../assets/terraform-apply-p1.png)
+![terraform apply](../../assets/terraform-apply-p1.png)
 
 - VPC resource map
 
-![VPC resource map console](../assets/vpc-resource-map.png)
+![VPC resource map console](../../assets/vpc-resource-map.png)
 
 - ECS service healthy
 
-![ECS task console](../assets/ecs-service-health.png)
+![ECS task console](../../assets/ecs-service-health.png)
 
 - ECS task reaches `RUNNING` state and connects to RDS successfully
 
-![ecs task running](../assets/ecs-task-running-p1.png)
+![ecs task running](../../assets/ecs-task-running-p1.png)
 
 - RDS Connect to VPC EndPoint interface
 
@@ -70,23 +70,23 @@ Infrastructure was validated before Phase 1 was marked complete:
 
 - Mattermost loads over HTTPS
 
-![mattermost.aris-saputra.dev screenshot](../assets/mattermost.aris-saputra.dev-website.png)
+![mattermost.aris-saputra.dev screenshot](../../assets/mattermost.aris-saputra.dev-website.png)
 
 - Uploaded file stored into S3 bucket
 
-![file in s3](../assets/mattermost-file-in-s3-storage.png)
+![file in s3](../../assets/mattermost-file-in-s3-storage.png)
 
 - CloudTrail logs delivered to S3 security logs
 
-![security logs bucket](../assets/security-logs-bucket.png)
+![security logs bucket](../../assets/security-logs-bucket.png)
 
 - S3 bucket object lock compliance mode denied deleting bucket
 
-![s3 log bucket delete denied](../assets/delete-s3-bucket-denied.png)
+![s3 log bucket delete denied](../../assets/delete-s3-bucket-denied.png)
 
 - `terraform destroy` passes
 
-![terraform destroy](../assets/tf-destroyed.png)
+![terraform destroy](../../assets/tf-destroyed.png)
 
 > The domain is not permanently live. The stack uses a deploy-and-destroy model — it is spun up during active lab sessions and torn down afterward to control cost. The screenshot above is the validation artifact.
 
@@ -111,4 +111,4 @@ Real debugging issues hit during Phase 1 — ECS role confusion, URI encoding in
 
 ## Next Phase
 
-[Phase 2 — AWS Well-Architected 6 Pillars →](phase-2-well-architected.md)
+[Phase 2 — Operational Exelence Pillar →](../phase-2-well-architected/pillar-1-operational-exelence.md)
