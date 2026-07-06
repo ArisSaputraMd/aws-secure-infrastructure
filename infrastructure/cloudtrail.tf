@@ -21,6 +21,7 @@ resource "aws_cloudtrail" "management_events" {
 # Security logs Bucket Policy - Central security logs
 # — CloudTrail Read (pre-flight check before delivery) and Write Permissions (log delivery)
 # - Config read and write permission
+# - WAFv2 write permission
 # ------------------------------------------------------------------------------
 data "aws_region" "current" {}
 
@@ -115,6 +116,30 @@ data "aws_iam_policy_document" "security_logs_policy" {
       values   = [data.aws_caller_identity.current.account_id]
     }
   }
+
+  statement {
+    sid    = "AWSWAFv2Write"
+    effect = "Allow"
+    principals {
+      type        = "Service"
+      identifiers = ["wafv2.amazonaws.com"]
+    }
+    actions = [
+      "s3:PutObject"
+    ]
+    resources = ["${aws_s3_bucket.security_logs.arn}/wafv2/AWSLogs/${data.aws_caller_identity.current.account_id}/*"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "s3:x-amz-acl"
+      values   = ["bucket-owner-full-control"]
+    }
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [data.aws_caller_identity.current.account_id]
+    }
+  }
 }
 
 
@@ -130,7 +155,7 @@ data "aws_iam_policy_document" "security_logs_policy" {
 # KMS Key
 # ------------------------------------------------------------------------------
 resource "aws_kms_key" "security_logs" {
-  description             = "CMK for encrypting CloudTrail logs — S3"
+  description             = "CMK for encrypting logs — S3"
   deletion_window_in_days = 30
   enable_key_rotation     = true
 
@@ -204,7 +229,25 @@ data "aws_iam_policy_document" "kms_policy" {
     }
   }
 
-
+  # AWS WAFv2: only the actions actually needed for log delivery.
+  statement {
+    sid    = "EnableWAFv2Permissions"
+    effect = "Allow"
+    principals {
+      type        = "Service"
+      identifiers = ["wafv2.amazonaws.com"]
+    }
+    actions = [
+      "kms:GenerateDataKey*",
+      "kms:Decrypt",
+    ]
+    resources = ["*"]
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [data.aws_caller_identity.current.account_id]
+    }
+  }
 }
 
 resource "aws_kms_key_policy" "security_logs" {

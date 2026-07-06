@@ -26,3 +26,8 @@
 #   depends_on  = [aws_securityhub_account.cspm]
 #   product_arn = "arn:aws:securityhub:${var.aws_region}::product/aws/guardduty"
 # }
+
+# resource "aws_securityhub_product_subscription" "inspector" {
+#   depends_on  = [aws_securityhub_account.cspm]
+#   product_arn = "arn:aws:securityhub:${var.aws_region}::product/aws/inspector"
+# }

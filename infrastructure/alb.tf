@@ -1,5 +1,5 @@
 # =============================================
-# alb.tf
+# Public facing Application Load Balancer (ALB) and tls termination for Mattermost ECS service
 # =============================================
 
 # Application Load Balancer — public facing
