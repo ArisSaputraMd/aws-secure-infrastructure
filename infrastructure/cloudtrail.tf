@@ -19,6 +19,7 @@ resource "aws_cloudtrail" "management_events" {
 
 # ------------------------------------------------------------------------------
 # Security logs Bucket Policy - Central security logs
+# - Deny insecure transport (http) to S3 bucket
 # — CloudTrail Read (pre-flight check before delivery) and Write Permissions (log delivery)
 # - Config read and write permission
 # - WAFv2 write permission
@@ -30,6 +31,29 @@ locals {
 }
 
 data "aws_iam_policy_document" "security_logs_policy" {
+  statement {
+    sid    = "DenyInsecureTransport"
+    effect = "Deny"
+
+    principals {
+      type        = "*"
+      identifiers = ["*"]
+    }
+
+    actions = ["s3:*"]
+
+    resources = [
+      aws_s3_bucket.security_logs.arn,
+      "${aws_s3_bucket.security_logs.arn}/*"
+    ]
+
+    condition {
+      test     = "Bool"
+      variable = "aws:SecureTransport"
+      values   = ["false"]
+    }
+  }
+
   statement {
     sid    = "AWSCloudTrailAclCheck"
     effect = "Allow"
