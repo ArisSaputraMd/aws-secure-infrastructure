@@ -208,3 +208,46 @@ resource "aws_iam_role_policy" "config_kms_policy" {
   role   = aws_iam_role.config_role.id
   policy = data.aws_iam_policy_document.config_kms_policy.json
 }
+
+# =============================================
+# IAM Roles and Policies for Lambda WAF Auto-Block
+# =============================================
+
+resource "aws_iam_role" "waf_autoblock_lambda" {
+  name = "${var.project_name}-${var.environment}-waf-autoblock-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = { Service = "lambda.amazonaws.com" }
+      Action    = "sts:AssumeRole"
+    }]
+  })
+}
+
+resource "aws_iam_role_policy" "waf_autoblock_permissions" {
+  name = "waf-autoblock-permissions"
+  role = aws_iam_role.waf_autoblock_lambda.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["wafv2:GetIPSet", "wafv2:UpdateIPSet"]
+        Resource = aws_wafv2_ip_set.auto_blocked_ips.arn
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["wafv2:GetSampledRequests"] # allow Lambda to get the offending Ip
+        Resource = aws_wafv2_web_acl.web_acl.arn
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"]
+        Resource = "arn:aws:logs:*:*:*"
+      }
+    ]
+  })
+}
