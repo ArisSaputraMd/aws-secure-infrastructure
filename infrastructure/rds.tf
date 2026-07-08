@@ -1,6 +1,16 @@
 # =============================================
 # rds.tf
 # =============================================
+# CloudWatch Log Group — stores rds logs
+resource "aws_cloudwatch_log_group" "rds" {
+  name              = "/aws/rds/instance/${var.project_name}-${var.environment}-db/postgresql"
+  retention_in_days = 30
+
+  tags = {
+    Name               = "${var.project_name}-${var.environment}-rds-logs"
+    DataClassification = "internal"
+  }
+}
 
 # DB Subnet Group — places RDS in private subnets
 resource "aws_db_subnet_group" "primary" {
@@ -14,12 +24,13 @@ resource "aws_db_subnet_group" "primary" {
 
 # RDS PostgreSQL Instance
 resource "aws_db_instance" "primary" {
-  identifier        = "${var.project_name}-${var.environment}-db"
-  engine            = "postgres"
-  engine_version    = "16.9"
-  instance_class    = "db.t3.micro"
-  allocated_storage = 20
-  storage_type      = "gp2"
+  identifier                      = "${var.project_name}-${var.environment}-db"
+  engine                          = "postgres"
+  engine_version                  = "16.9"
+  instance_class                  = "db.t3.micro"
+  allocated_storage               = 20
+  storage_type                    = "gp2"
+  enabled_cloudwatch_logs_exports = ["postgresql"]
 
   db_name  = var.db_name
   username = var.db_username
@@ -33,6 +44,7 @@ resource "aws_db_instance" "primary" {
   multi_az            = false
   publicly_accessible = false
   storage_encrypted   = true
+  kms_key_id          = aws_kms_key.rds.arn
   skip_final_snapshot = true
 
   tags = {
@@ -40,3 +52,4 @@ resource "aws_db_instance" "primary" {
     DataClassification = "Confidential"
   }
 }
+

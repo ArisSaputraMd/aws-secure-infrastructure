@@ -268,7 +268,6 @@ resource "aws_wafv2_web_acl_logging_configuration" "waf_logging" {
 }
 
 # WAF automation 
-# 
 resource "aws_wafv2_ip_set" "auto_blocked_ips" {
   name               = "${var.project_name}-${var.environment}-auto-blocked"
   scope              = "REGIONAL"
