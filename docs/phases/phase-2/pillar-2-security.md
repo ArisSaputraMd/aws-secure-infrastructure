@@ -6,9 +6,13 @@
 
 ## Scope
 
-This document covers the Security pillar only. Operational monitoring for ECS and RDS (application/database logs, health metrics, CloudWatch Alarms for service availability) is covered separately under the Operational Excellence pillar.
+This document covers the Security pillar only. Operational monitoring for ECS and RDS (service health, infrastructure metrics, CloudWatch Alarms, application logs, database logs, and CloudWatch Logs Insights) is covered separately under the Operational Excellence pillar.
 
-Security logging (CloudTrail, VPC Flow Logs, ALB access logs, WAF logs) and operational logging are intentionally split. See Detection #6. for the reasoning.
+Although ECS and RDS logs support both operational troubleshooting and security investigations, security logging is intentionally tiered.
+
+Application and database logs are retained in CloudWatch Logs for rapid analysis with CloudWatch Logs Insights. These logs have a 30-day retention period, providing fast access to recent operational and security events, while high-volume security telemetry (CloudTrail, VPC Flow Logs, ALB access logs, WAF logs, and AWS Config snapshots) is stored in Amazon S3 and queried with Amazon Athena.
+
+This approach avoids the additional CloudWatch Logs ingestion cost for high-volume security telemetry while still providing efficient long-term storage and investigation capabilities.
 
 ---
 
@@ -80,9 +84,19 @@ The EventBridge rules in this section match CloudTrail management events directl
 
 **6. Monitoring and Investigation**
 
-Security Hub provides a dashboard for security findings, compliance violations, IAM drift, and CVE scanning. Amazon Athena queries CloudTrail logs, VPC Flow Logs, ALB access logs, WAF logs, and Config snapshots stored in S3. QuickSight provides dashboards for visibility on top of Athena query results.
+Security Hub provides a centralized dashboard for security findings, compliance violations, IAM posture, and Inspector vulnerability findings.
 
-Real-time detection (CloudWatch Alarms on WAF metrics, EventBridge-matched CloudTrail events) and after-the-fact investigation (Athena/QuickSight over S3) are deliberately split: metrics/alarms answer "is something happening right now," logs answer "what exactly happened, in detail."
+CloudWatch Logs Insights is used to rapidly query ECS application logs and Amazon RDS PostgreSQL logs stored in CloudWatch Logs. These logs support both operational troubleshooting and security investigations, including application errors, failed authentication attempts, database connection failures, and suspicious application behavior.
+
+Amazon Athena queries CloudTrail logs, VPC Flow Logs, ALB access logs, WAF logs, and AWS Config snapshots stored in Amazon S3. Amazon QuickSight provides dashboards on top of Athena query results for historical analysis, compliance reporting, and security investigations.
+
+This architecture intentionally uses a tiered logging strategy:
+
+- CloudWatch Metrics and Alarms provide near real-time monitoring of infrastructure and service health.
+- CloudWatch Logs Insights enables fast investigation of recent ECS and RDS logs for both operational and security use cases.
+- Amazon S3, Athena, and QuickSight provide cost-effective long-term storage, querying, and visualization of high-volume security telemetry.
+
+This approach balances investigation speed, long-term retention, and cost by keeping frequently accessed application and database logs in CloudWatch while storing large-volume security logs in Amazon S3 for scalable analytics.
 
 ---
 
@@ -232,6 +246,7 @@ Conduct a post-incident review: document the timeline, root cause, detection sou
 | AWS IAM Access Analyzer    | Type = "ACCOUNT".                                                                                                                                                                                                                                                                                                                     |
 | AWS Security Hub           | Classic CSPM and Security Hub v2: `foundational-security-best-practices/v/1.0.0`, `cis-aws-foundations-benchmark/v/5.0.0`, `product/aws/guardduty`, `product/aws/inspector`.                                                                                                                                                          |
 | S3 (`logs`) + KMS          | S3 with COMPLIANCE object lock, versioning enabled, lifecycle tiering to IA → Glacier IR → Deep Archive, SSE-KMS with CMK, key rotation enabled, 30-day deletion window.                                                                                                                                                              |
+| Clodwatch log group        | ECS Logs and RDS Logs, Retention in 30 days.                                                                                                                                                                                                                                                                                          |
 | EventBridge + SNS          | Captures CloudTrail events that violate CIS Benchmark v5.0, routes to SNS topics for notification.                                                                                                                                                                                                                                    |
 | Glue + Athena + QuickSight | SQL query interface over shared S3 `security_logs` bucket for investigation.                                                                                                                                                                                                                                                          |
 
