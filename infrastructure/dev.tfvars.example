@@ -1,0 +1,72 @@
+# =============================================
+# Note : 
+# this file is for dev environment, object lock for logs  
+# bucket is disabled (bucket deletable trough terraform
+# destroy ) and short compliance window for testing
+
+# For production env replace the s3 block with : 
+
+# s3 --- logs buckets
+# logs_bucket_object_lock   = true
+# logs_bucket_force_destroy = false
+# bucket_compliance_days    = 365
+
+# s3 --- app bucket
+mattermost_files_force_destroy = false
+
+# =============================================
+
+# provider
+aws_region  = "your-resource-region"
+aws_profile = "default"
+
+# dns 
+domain_name   = "Root domain name for the project"
+app_subdomain = "mattermost"
+
+# Networking
+az_count = Number of availability zones to use 
+vpc_cidr = "your vpc cidr" 
+
+# ecs-cluster
+ecs_cluster_name = "Name of the ECS cluster"
+
+# db-dsn (ssm)
+db_name         = "databse name"
+db_username     = "database username" 
+
+# Email notification address
+security_email = "your security team email"
+root_owner_email = "your root account email"
+
+# s3 - logs buckets
+logs_bucket_object_lock   = false
+logs_bucket_force_destroy = true
+bucket_compliance_days    = 1
+
+# s3 - app bucket
+mattermost_files_force_destroy = true
+
+# Tags for resources
+project_name        = "your-project-name"
+environment         = "dev"
+owner               = "Owner of the resources"  
+managed_by          = "Entity responsible for managing the resources"            
+data_classification = "internal"           #default value, overide with resources level tags
+
+
+
+aws_region   = 
+aws_profile  = "default"
+project_name = "your-project-name"
+environment  = "dev"
+domain_name  = "your-domain-name"
+db_username  = "admin-name"
+
+# Object lock settings
+
+# For active development, object lock is disabled, bucket deletable and short compliance window for testing
+logs_bucket_object_lock   = false
+logs_bucket_force_destroy = true
+bucket_compliance_days    = 1
+

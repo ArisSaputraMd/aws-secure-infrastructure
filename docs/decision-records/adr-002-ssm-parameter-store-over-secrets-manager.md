@@ -39,8 +39,8 @@ Because Terraform writes the DSN to SSM, the value also ends up in `.tfstate` in
 
 A production setup would require one of:
 
-- A remote backend (S3) with encryption and tightly-scoped access controls on the state file
-- An approach that avoids passing the DSN through Terraform entirely — for example, constructing the DSN at runtime inside the container, or using Secrets Manager's native ECS integration which avoids the Terraform-managed write path
+- A remote backend (S3) with encryption and tightly-scoped access controls on the state file (planned in phase 3)
+- An approach that avoids passing the DSN through Terraform entirely. For example, constructing the DSN at runtime inside the container, or using Secrets Manager's native ECS integration which avoids the Terraform-managed write path
 
 ---
 
@@ -48,4 +48,4 @@ A production setup would require one of:
 
 - No additional cost for Phase 1 secrets management.
 - Credential rotation is manual — acceptable for a lab environment with a single static credential.
-- DSN is present in local `.tfstate` in plaintext — acceptable for a lab, unacceptable for production.
+- DSN is present in local `.tfstate` in plaintext, acceptable for a lab, unacceptable for production.

@@ -1,31 +1,11 @@
 # =============================================
-# Security Alerting — EventBridge + SNS
-# =============================================
+# Security Alerting — EventBridge/CW Alarm + SNS, 
 #
 # Alert routing:
 #  security team  - all topics
 #  root owner     - root_usage topic only
-#
-# Email recipients are stored in SSM (not hardcoded).
 # =============================================
 
-
-# -----------------------------------------------------------------
-# SSM — Alert recipients
-# -----------------------------------------------------------------
-
-data "aws_ssm_parameter" "security_email" {
-  name = "/${var.environment}/${var.project_name}/alerts/security-email"
-}
-
-data "aws_ssm_parameter" "root_owner_email" {
-  name = "/${var.environment}/${var.project_name}/alerts/root-owner-email"
-}
-
-
-# -----------------------------------------------------------------
-# Shared: SNS publish policies
-# -----------------------------------------------------------------
 
 data "aws_iam_policy_document" "sns_topic_cloudtrail_changes" {
   statement {
@@ -227,7 +207,7 @@ resource "aws_sns_topic_policy" "iam_warning" {
 resource "aws_sns_topic_subscription" "iam_warning_security" {
   topic_arn = aws_sns_topic.iam_warning.arn
   protocol  = "email"
-  endpoint  = data.aws_ssm_parameter.security_email.value
+  endpoint  = var.security_email
 }
 
 # -----------------------------------------------------------------
@@ -293,14 +273,14 @@ resource "aws_sns_topic_policy" "root_usage" {
 resource "aws_sns_topic_subscription" "root_usage_security" {
   topic_arn = aws_sns_topic.root_usage.arn
   protocol  = "email"
-  endpoint  = data.aws_ssm_parameter.security_email.value
+  endpoint  = var.security_email
 }
 
 # Root owner is notified only for root usage
 resource "aws_sns_topic_subscription" "root_usage_owner" {
   topic_arn = aws_sns_topic.root_usage.arn
   protocol  = "email"
-  endpoint  = data.aws_ssm_parameter.root_owner_email.value
+  endpoint  = var.root_owner_email
 }
 
 # -----------------------------------------------------------------
@@ -370,7 +350,7 @@ resource "aws_sns_topic_policy" "cloudtrail_changes" {
 resource "aws_sns_topic_subscription" "cloudtrail_changes_security" {
   topic_arn = aws_sns_topic.cloudtrail_changes.arn
   protocol  = "email"
-  endpoint  = data.aws_ssm_parameter.security_email.value
+  endpoint  = var.security_email
 }
 
 # -----------------------------------------------------------------
@@ -439,7 +419,7 @@ resource "aws_sns_topic_policy" "sg_changes" {
 resource "aws_sns_topic_subscription" "sg_changes_security" {
   topic_arn = aws_sns_topic.sg_changes.arn
   protocol  = "email"
-  endpoint  = data.aws_ssm_parameter.security_email.value
+  endpoint  = var.security_email
 }
 
 
@@ -509,7 +489,7 @@ resource "aws_sns_topic_policy" "console_login_no_mfa" {
 resource "aws_sns_topic_subscription" "console_login_no_mfa_security" {
   topic_arn = aws_sns_topic.console_login_no_mfa.arn
   protocol  = "email"
-  endpoint  = data.aws_ssm_parameter.security_email.value
+  endpoint  = var.security_email
 }
 
 # -----------------------------------------------------------------
@@ -576,7 +556,7 @@ resource "aws_sns_topic_policy" "kms_key_changes" {
 resource "aws_sns_topic_subscription" "kms_key_changes_security" {
   topic_arn = aws_sns_topic.kms_key_changes.arn
   protocol  = "email"
-  endpoint  = data.aws_ssm_parameter.security_email.value
+  endpoint  = var.security_email
 }
 
 # -----------------------------------------------------------------
@@ -647,7 +627,7 @@ resource "aws_sns_topic_policy" "nacl_changes" {
 resource "aws_sns_topic_subscription" "nacl_changes_security" {
   topic_arn = aws_sns_topic.nacl_changes.arn
   protocol  = "email"
-  endpoint  = data.aws_ssm_parameter.security_email.value
+  endpoint  = var.security_email
 }
 
 
@@ -728,5 +708,5 @@ resource "aws_sns_topic_policy" "securityhub_findings" {
 resource "aws_sns_topic_subscription" "securityhub_findings" {
   topic_arn = aws_sns_topic.securityhub_findings.arn
   protocol  = "email"
-  endpoint  = data.aws_ssm_parameter.security_email.value
+  endpoint  = var.security_email
 }

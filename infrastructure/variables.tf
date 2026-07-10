@@ -51,10 +51,34 @@ variable "ecs_cluster_name" {
 # =============================================
 # S3
 # =============================================
+# app bucket
 variable "mattermost_files_force_destroy" {
   description = "Delete S3 bucket when Terraform destroy"
   type        = bool
   default     = false
+}
+
+# logs bucket
+variable "logs_bucket_force_destroy" {
+  description = <<-EOT
+      Whether to force-delete all objects in the security logs bucket on destroy.
+      Must be false in prod — COMPLIANCE object lock will block force-destroy anyway,
+      but keeping this false makes the intent explicit and prevents accidents.
+    EOT
+  type        = bool
+  default     = false
+}
+
+variable "logs_bucket_object_lock" {
+  description = "dev env will be set to false, and true for prod env"
+  type        = bool
+  default     = false
+}
+
+variable "bucket_compliance_days" {
+  type        = number
+  description = "Compliance retention for logs bucket"
+  default     = 365
 }
 # =============================================
 # Database
@@ -71,14 +95,18 @@ variable "db_username" {
   default     = "mattermost"
 }
 
-variable "db_password" {
-  description = "Master password for RDS"
-  type        = string
-  sensitive   = true
+# =============================================
+# Alerts recipients
+# =============================================
+variable "security_email" {
+  description = "Email address for all security alerts"
+  type = string
 }
 
-
-
+variable "root_owner_email" {
+  description = "Email address for root account security related"
+  type = string
+}
 # =============================================
 # Tags
 # =============================================

@@ -21,6 +21,7 @@ Phase 1 establishes the foundational infrastructure required to run Mattermost o
 | S3 Bucket (`mattermost-file`)  | Version Enabled, SSE-KMS with CMK, lifecycle tiering to Intelligent Tiering, and noncurrent version expires after 6 month.                                  |
 | ALB + ACM                      | TLS termination in public subnets, HTTP→HTTPS redirect, health checks on `/api/v4/system/ping`                                                              |
 | Route 53                       | Hosted zone, ALB alias record, ACM validation records                                                                                                       |
+| ECR Repository                 | scan-on-push enabled, force delete, mutable image tag                                                                                                       |
 | SSM Parameter Store            | DB password stored manually as `SecureString` (free standard tier); DSN constructed in `locals` and injected at container start via `secrets` block         |
 | CloudTrail + S3 (`logs`) + KMS | Multi-region management event capture; S3 with COMPLIANCE object lock, SSE-KMS with CMK, lifecycle tiering to IA → Glacier IR → Deep Archive                |
 

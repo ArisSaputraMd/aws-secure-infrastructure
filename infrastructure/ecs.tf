@@ -1,6 +1,19 @@
-# =============================================
-# ecs.tf
-# =============================================
+# ECR Repository
+resource "aws_ecr_repository" "mattermost" {
+  name                 = "${var.project_name}-${var.environment}-mattermost"
+  image_tag_mutability = "MUTABLE"
+  force_delete         = true
+
+  image_scanning_configuration {
+    scan_on_push = true
+  }
+
+  tags = {
+    Name               = "${var.project_name}-${var.environment}-mattermost-ecr"
+    DataClassification = "internal"
+  }
+}
+
 # CloudWatch Log Group — stores Mattermost container logs
 resource "aws_cloudwatch_log_group" "ecs" {
   name              = "/ecs/${var.project_name}-${var.environment}"
@@ -34,7 +47,7 @@ resource "aws_ecs_task_definition" "mattermost" {
   container_definitions = jsonencode([
     {
       name      = "mattermost"
-      image     = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/mattermost/mattermost-team-edition:latest"
+      image     = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/mattermost/mattermost-team-edition:11.9.0"
       essential = true
 
       portMappings = [

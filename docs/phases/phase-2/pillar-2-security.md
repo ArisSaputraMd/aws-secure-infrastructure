@@ -143,7 +143,11 @@ A customer managed KMS key (CMK) was selected instead of an AWS-managed KMS key 
 
 The Docker container runs as a non-root user (`mattermost`). Root (UID 0) is never used at runtime, reducing the impact of a container-level compromise.
 
-ECR is configured with scan-on-push (enhanced scanning) and continuous scanning by AWS Inspector, which re-scans automatically as new CVEs are disclosed.
+AWS Inspector is enabled at account level with sepecific resource (ECR, Lambda, and lambda function). By enabling Inspector, it will automatically enabled ECR scan-on-push (enhanced scanning). AWS Inspector will re-scans automatically as new CVEs are disclosed.
+
+```Note
+AWS inspector is dissabled by default in this project, see Accepted Tradeoffs below.
+```
 
 ---
 

@@ -352,7 +352,7 @@ resource "aws_sns_topic_policy" "waf_alerts" {
 resource "aws_sns_topic_subscription" "waf_alerts_security" {
   topic_arn = aws_sns_topic.waf_alerts.arn
   protocol  = "email"
-  endpoint  = data.aws_ssm_parameter.security_email.value
+  endpoint  = var.security_email
 }
 
 resource "aws_sns_topic_subscription" "lambda_trigger" {

@@ -8,6 +8,7 @@ Step-by-step guide to deploy and tear down the stack.
 
 - Registered domain with DNS delegated to a Route 53 hosted zone
 - AWS CLI installed and authenticated (`aws configure` — default region must be `ap-southeast-3`)
+- Docker installed and running (Docker Desktop or Docker Engine)
 - `tfenv` installed (macOS):
 
 ```bash
@@ -23,16 +24,68 @@ tfenv use 1.15.5
 ```bash
 git clone https://github.com/ArisSaputraMd/aws-secure-infrastructure.git
 cd aws-secure-infrastructure/infrastructure
-cp terraform.tfvars.example terraform.tfvars
+cp dev.tfvars.example dev.tfvars
 ```
 
-Edit `terraform.tfvars` with your values. Required variables are documented in `terraform.tfvars.example`.
+Edit `dev.tfvars` with your values. Required variables are documented in `dev.tfvars.example`.
 
 ---
 
-## 2. Store the DB Password in SSM
+## 2. Create the ECR Repository and Push the Image
 
-Before applying, manually create the DB password parameter in SSM as a `SecureString`:
+The ECS service pulls its container image from ECR on first launch. The repository must exist and contain an image _before_ the rest of the stack is applied, or the ECS service will fail to place tasks.
+
+Initialize and create only the ECR repository first (do not generate a full-stack plan here — a plan saved now will go stale the moment this targeted apply changes state):
+
+```bash
+terraform init
+terraform validate
+terraform apply -target=aws_ecr_repository.mattermost
+```
+
+Move to the repo root to build the image (the Dockerfile lives at repo root, not inside `infrastructure/`):
+
+```bash
+cd ..
+```
+
+Make sure Docker Desktop is running (open it from Applications, or `open -a Docker` from the terminal, and wait for it to fully start).
+
+Build the image using this repo's `Dockerfile`. Use `--platform linux/amd64` even if you're building on Apple Silicon — the ECS Fargate tasks in this stack run on amd64, and a native ARM build will fail at container startup with an exec format error rather than at build time:
+
+```bash
+docker build --platform linux/amd64 -t mattermost:11.9.0 .
+```
+
+Authenticate Docker to ECR:
+
+```bash
+aws ecr get-login-password --region ap-southeast-3 | \
+  docker login --username AWS --password-stdin <account-id>.dkr.ecr.ap-southeast-3.amazonaws.com
+```
+
+Tag and push (note the registry hostname is one unbroken string — a line break or stray space here will produce a confusing "requires 2 arguments" error):
+
+```bash
+docker tag mattermost:11.9.0 <account-id>.dkr.ecr.ap-southeast-3.amazonaws.com/<repo-name>:11.9.0
+docker push <account-id>.dkr.ecr.ap-southeast-3.amazonaws.com/<repo-name>:11.9.0
+```
+
+> Get `<account-id>` and `<repo-name>` from `terraform output` (after the
+> targeted apply above) or from `dev.tfvars`. The version tag (`11.9.0`)
+> must match whatever is currently pinned in the Dockerfile's `FROM` line and task `definition_container` image in [ecs.tf](../../infrastructure/ecs.tf) (keep these in sync if you bump the Mattermost version).
+
+Return to the `infrastructure/` directory before continuing:
+
+```bash
+cd infrastructure
+```
+
+---
+
+## 3. Store the Database Password in SSM
+
+This parameter are intentionally not managed by Terraform (see [ADR-002](/docs/decision-records/adr-002-ssm-parameter-store-over-secrets-manager.md)) and must exist before the full stack apply in Step 4, or the affected resource will fail to read it.
 
 ```bash
 aws ssm put-parameter \
@@ -42,24 +95,26 @@ aws ssm put-parameter \
   --region ap-southeast-3
 ```
 
-Replace `<environment>`, `<project_name>`, and `<your-password>` with your values from `terraform.tfvars`. The region must match your deployment region.
-
 > The DSN is constructed by Terraform in `ssm.tf` and stored as a second SSM parameter. It does not need to be created manually.
 
 ---
 
-## 3. Apply
+## 4. Apply the Rest of the Stack
+
+Generate and apply a fresh plan now that the ECR repo exists and the image has been pushed:
 
 ```bash
-terraform init
-terraform validate
 terraform plan -out=tfplan
 terraform apply tfplan
 ```
 
+## 5. SNS email confirmation required.
+
+After Step 4's apply creates the SNS subscriptions, AWS sends a confirmation email to `security_email` and `root_owner_email` addresses you fill in your `.tfvars` (root email only recheive alert related to root account security). Alerts will not be delivered until each recipient clicks the confirmation link. Check both inboxes (including spam) after applying, and confirm before relying on this stack for real alerting.
+
 ---
 
-## 4. Verify
+## 6. Verify
 
 After a successful apply, confirm the stack is working:
 
@@ -71,13 +126,15 @@ Open the URL in a browser and confirm Mattermost loads over HTTPS. If the ECS ta
 
 ---
 
-## 5. Tear Down
+## 7. Tear Down
 
 ```bash
 terraform destroy -auto-approve
 ```
 
 > The stack is designed as a deploy-and-destroy lab. Tear it down when not actively in use to avoid idle cost.
+>
+> The ECR repository and the image pushed in Step 2 are destroyed along with everything else. You will need to rebuild and repush on the next deploy unless you change the repository to `force_delete = false` and manage image retention separately (not currently how this project is configured).
 
 ---
 
@@ -85,7 +142,7 @@ terraform destroy -auto-approve
 
 ### CloudTrail S3 bucket object lock
 
-Object lock behavior is controlled by `logs_bucket_object_lock` in `terraform.tfvars`:
+Object lock behavior is controlled by `logs_bucket_object_lock` in `dev.tfvars`:
 
 | Environment | Value   | Behavior                                                                                        |
 | ----------- | ------- | ----------------------------------------------------------------------------------------------- |

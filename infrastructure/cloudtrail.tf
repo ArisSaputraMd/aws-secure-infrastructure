@@ -427,24 +427,4 @@ resource "aws_s3_bucket_lifecycle_configuration" "security_logs" {
 # ==============================================================================
 # variables.tf
 # ==============================================================================
-variable "logs_bucket_force_destroy" {
-  description = <<-EOT
-      Whether to force-delete all objects in the security logs bucket on destroy.
-      Must be false in prod — COMPLIANCE object lock will block force-destroy anyway,
-      but keeping this false makes the intent explicit and prevents accidents.
-    EOT
-  type        = bool
-  default     = false
-}
 
-variable "logs_bucket_object_lock" {
-  description = "dev env will be set to false, and true for prod env"
-  type        = bool
-  default     = false
-}
-
-variable "bucket_compliance_days" {
-  type        = number
-  description = "Compliance retention for logs bucket"
-  default     = 365
-}
