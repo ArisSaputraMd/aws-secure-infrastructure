@@ -1,17 +1,7 @@
 # ==============================================================================
-# Mattermost file storage 
-# Key properties:
-#   - KMS-encrypted (CMK, bucket key enabled for cost saving)
-#   - Public access fully blocked
-#   - versioning - noncurrent expire after 90 days
-#   - Lifecycle: intelligent tiering
+# App Bucket - Mattermost file storage 
 # ==============================================================================
 
-# ------------------------------------------------------------------------------
-# Bucket
-# force_destroy is controlled via a variable. In production, this must be false to prevent Terraform from deleting
-# non-empty S3 buckets and their contents during destroy operations.
-# ------------------------------------------------------------------------------
 resource "aws_s3_bucket" "mattermost_files" {
 
   bucket        = "${var.project_name}-${var.environment}-mattermost-files-${data.aws_caller_identity.current.account_id}"
@@ -23,7 +13,7 @@ resource "aws_s3_bucket" "mattermost_files" {
   }
 }
 
-# ------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Bucket Policy
 # ------------------------------------------------------------------------------
 
@@ -57,11 +47,7 @@ resource "aws_s3_bucket_policy" "mattermost_files_policy" {
   policy = data.aws_iam_policy_document.ecs_task_s3.json
 }
 
-# ------------------------------------------------------------------------------
-# Versioning
-# recomended to recovery of accidentally deleted files
-# old version will be expires after 3 month
-# ------------------------------------------------------------------------------
+# Versioning enabled for recovery of accidentally deleted files
 resource "aws_s3_bucket_versioning" "mattermost-files" {
   bucket = aws_s3_bucket.mattermost_files.id
   versioning_configuration {
@@ -70,11 +56,8 @@ resource "aws_s3_bucket_versioning" "mattermost-files" {
 }
 
 
-# ------------------------------------------------------------------------------
-# KMS Encryption
 # SSE-KMS with CMK. bucket_key_enabled reduces KMS API calls (and cost)
 # by caching the data key at the S3 layer rather than calling KMS per object.
-# ------------------------------------------------------------------------------
 resource "aws_s3_bucket_server_side_encryption_configuration" "mattermost-files" {
   bucket = aws_s3_bucket.mattermost_files.id
 
@@ -87,11 +70,8 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "mattermost-files"
   }
 }
 
-# ------------------------------------------------------------------------------
 # Block Public Access
-# Belt-and-suspenders on top of the bucket policy. Prevents any future policy
-# change from accidentally making logs public.
-# ------------------------------------------------------------------------------
+# Belt-and-suspenders on top of the bucket policy. Prevents any future policy change from accidentally making logs public.
 resource "aws_s3_bucket_public_access_block" "mattermost_files" {
   bucket = aws_s3_bucket.mattermost_files.id
 
@@ -103,7 +83,7 @@ resource "aws_s3_bucket_public_access_block" "mattermost_files" {
 
 #------------------------------------------------------------------------------
 # Lifecycle Configuration
-# Old version will expire after 90 days
+# Old version will expire after 180 days
 # Timeline:
 #   Day  0  → STANDARD        (hot, immediately accessible)
 #   Day 90  → Intelligent Tiering  - not accessed file
@@ -146,4 +126,339 @@ resource "aws_s3_bucket_lifecycle_configuration" "mattermost_files_versions" {
     }
   }
 }
+
+# ==============================================================================
+# Logs bucket
+# - force_destroy is controlled via a variable. In production, this must be false to prevent Terraform from deleting
+#   non-empty S3 buckets and their contents during destroy operations.
+# - Object lock and retention are controled via variable, dev env are set to false as default.
+# ==============================================================================
+resource "aws_s3_bucket" "security_logs" {
+  depends_on = [aws_kms_key.security_logs]
+
+  bucket              = "${var.project_name}-${var.environment}-security-logs-v2"
+  force_destroy       = var.logs_bucket_force_destroy
+  object_lock_enabled = var.logs_bucket_object_lock
+
+  tags = {
+    Name               = "${var.project_name}-${var.environment}-security-logs"
+    DataClassification = "Restricted"
+  }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "security_logs" {
+  bucket = aws_s3_bucket.security_logs.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      kms_master_key_id = aws_kms_key.security_logs.arn
+      sse_algorithm     = "aws:kms"
+    }
+    bucket_key_enabled = true
+  }
+}
+
+# Versioning - Required for object lock and state visibility.
+resource "aws_s3_bucket_versioning" "security_logs" {
+  depends_on = [aws_s3_bucket.security_logs]
+  bucket     = aws_s3_bucket.security_logs.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+# Block public access
+resource "aws_s3_bucket_public_access_block" "security_logs" {
+  bucket = aws_s3_bucket.security_logs.id
+
+  block_public_acls       = true
+  ignore_public_acls      = true
+  block_public_policy     = true
+  restrict_public_buckets = true
+}
+
+# Object Lock for prod env — set logs_bucket_object_lock = true in .tfvars to enable it
+resource "aws_s3_bucket_object_lock_configuration" "security_logs" {
+  count      = var.logs_bucket_object_lock ? 1 : 0
+  depends_on = [aws_s3_bucket_versioning.security_logs]
+  bucket     = aws_s3_bucket.security_logs.id
+
+  rule {
+    default_retention {
+      mode = "COMPLIANCE"
+      days = var.bucket_compliance_days
+    }
+  }
+}
+
+# ------------------------------------------------------------------------------
+# Security logs Bucket Policy - Central security logs
+# ------------------------------------------------------------------------------
+data "aws_region" "current" {}
+
+# construct arn to prevent cycle dependency
+locals {
+  cloudtrail_arn = "arn:aws:cloudtrail:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:trail/${var.project_name}-${var.environment}-cloudtrail"
+}
+
+locals {
+  flow_logs_arn = "arn:aws:logs:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:*"
+}
+
+data "aws_iam_policy_document" "security_logs_policy" {
+  # Deny insecure transport (http) to S3 bucket
+  statement {
+    sid    = "DenyInsecureTransport"
+    effect = "Deny"
+
+    principals {
+      type        = "*"
+      identifiers = ["*"]
+    }
+
+    actions = ["s3:*"]
+
+    resources = [
+      aws_s3_bucket.security_logs.arn,
+      "${aws_s3_bucket.security_logs.arn}/*"
+    ]
+
+    condition {
+      test     = "Bool"
+      variable = "aws:SecureTransport"
+      values   = ["false"]
+    }
+  }
+
+  # CloudTrail Read (pre-flight check before delivery) and Write Permissions (log delivery)
+  statement {
+    sid    = "AWSCloudTrailAclCheck"
+    effect = "Allow"
+
+    principals {
+      type        = "Service"
+      identifiers = ["cloudtrail.amazonaws.com"]
+    }
+
+    actions   = ["s3:GetBucketAcl"]
+    resources = [aws_s3_bucket.security_logs.arn]
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceArn"
+      values   = [local.cloudtrail_arn]
+    }
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [data.aws_caller_identity.current.account_id]
+    }
+  }
+
+  # CloudTrail Write Permissions (log delivery)
+  statement {
+    sid    = "AWSCloudTrailWrite"
+    effect = "Allow"
+
+    principals {
+      type        = "Service"
+      identifiers = ["cloudtrail.amazonaws.com"]
+    }
+
+    actions   = ["s3:PutObject"]
+    resources = ["${aws_s3_bucket.security_logs.arn}/cloudtrail/management-events/AWSLogs/${data.aws_caller_identity.current.account_id}/*"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "s3:x-amz-acl"
+      values   = ["bucket-owner-full-control"]
+    }
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceArn"
+      values   = [local.cloudtrail_arn]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [data.aws_caller_identity.current.account_id]
+    }
+  }
+
+  # Config read permission
+  statement {
+    sid    = "AWSConfigCheck"
+    effect = "Allow"
+
+    principals {
+      type        = "Service"
+      identifiers = ["delivery.logs.amazonaws.com"]
+    }
+
+    actions   = ["s3:GetBucketAcl"]
+    resources = [aws_s3_bucket.security_logs.arn]
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [data.aws_caller_identity.current.account_id]
+    }
+  }
+
+  # Config write permission
+  statement {
+    sid    = "AWSConfigWrite"
+    effect = "Allow"
+
+    principals {
+      type        = "Service"
+      identifiers = ["delivery.amazonaws.com"]
+    }
+
+    actions   = ["s3:PutObject"]
+    resources = ["${aws_s3_bucket.security_logs.arn}/config/AWSLogs/${data.aws_caller_identity.current.account_id}/Config/*"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "s3:x-amz-acl"
+      values   = ["bucket-owner-full-control"]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [data.aws_caller_identity.current.account_id]
+    }
+  }
+
+  # WAFv2 write permission
+  statement {
+    sid    = "AWSWAFv2Write"
+    effect = "Allow"
+    principals {
+      type        = "Service"
+      identifiers = ["delivery.logs.amazonaws.com"]
+    }
+    actions = [
+      "s3:PutObject"
+    ]
+    resources = ["${aws_s3_bucket.security_logs.arn}/wafv2/AWSLogs/${data.aws_caller_identity.current.account_id}/*"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "s3:x-amz-acl"
+      values   = ["bucket-owner-full-control"]
+    }
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [data.aws_caller_identity.current.account_id]
+    }
+  }
+
+
+  # - VPC Flow logs permission
+  statement {
+    sid    = "AWSFlowLogsAclCheck"
+    effect = "Allow"
+
+    principals {
+      type        = "Service"
+      identifiers = ["delivery.logs.amazonaws.com"]
+    }
+
+    actions   = ["s3:GetBucketAcl"]
+    resources = [aws_s3_bucket.security_logs.arn]
+
+
+    condition {
+      test     = "ArnLike"
+      variable = "aws:SourceArn"
+      values   = [local.flow_logs_arn]
+    }
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [data.aws_caller_identity.current.account_id]
+    }
+  }
+
+  statement {
+    sid    = "AWSFlowLogsWrite"
+    effect = "Allow"
+    principals {
+      type        = "Service"
+      identifiers = ["delivery.logs.amazonaws.com"]
+    }
+    actions = [
+      "s3:PutObject"
+    ]
+    resources = ["${aws_s3_bucket.security_logs.arn}/flow-logs/AWSLogs/${data.aws_caller_identity.current.account_id}/*"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "s3:x-amz-acl"
+      values   = ["bucket-owner-full-control"]
+    }
+    condition {
+      test     = "ArnLike"
+      variable = "aws:SourceAccount"
+      values   = [local.flow_logs_arn]
+    }
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [data.aws_caller_identity.current.account_id]
+    }
+  }
+}
+
+resource "aws_s3_bucket_policy" "security_logs_policy" {
+  depends_on = [data.aws_iam_policy_document.security_logs_policy]
+  bucket     = aws_s3_bucket.security_logs.id
+  policy     = data.aws_iam_policy_document.security_logs_policy.json
+}
+
+
+# ------------------------------------------------------------------------------
+# Lifecycle Configuration
+# Transitions logs through cheaper storage tiers as they age.
+#
+# Timeline:
+#   Day  0  → STANDARD        (hot, immediately accessible)
+#   Day 30  → STANDARD_IA     (infrequent access, same latency)
+#   Day 90  → GLACIER_IR      (instant retrieval, ~60% cheaper than IA)
+#   Day 365 → DEEP_ARCHIVE    (bulk retrieval 12h, ~80% cheaper than Glacier IR)
+# ------------------------------------------------------------------------------
+resource "aws_s3_bucket_lifecycle_configuration" "security_logs" {
+  depends_on = [aws_s3_bucket_versioning.security_logs]
+  bucket     = aws_s3_bucket.security_logs.id
+
+  rule {
+    id     = "cloudtrail-log-tiering"
+    status = "Enabled"
+
+    filter {
+      prefix = "cloudtrail/management-events"
+    }
+
+    transition {
+      days          = 30
+      storage_class = "STANDARD_IA"
+    }
+
+    transition {
+      days          = 90
+      storage_class = "GLACIER_IR"
+    }
+
+    transition {
+      days          = 365
+      storage_class = "DEEP_ARCHIVE"
+    }
+
+  }
+}
+
 

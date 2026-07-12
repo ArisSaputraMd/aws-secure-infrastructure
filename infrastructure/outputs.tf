@@ -55,16 +55,6 @@ output "vpc_flow_log_arn" {
   value       = aws_flow_log.vpc.arn
 }
 
-output "vpc_cw_log_group_arn" {
-  description = "Destination for vpc flow logs"
-  value       = aws_cloudwatch_log_group.vpc.arn
-}
-
-output "flow_logs_role" {
-  description = "Role for flow logs ARN"
-  value       = aws_iam_role.flow_logs_role.arn
-}
-
 output "config_recorder" {
   description = "AWS Config configurations recorder"
   value       = aws_config_configuration_recorder.config.id

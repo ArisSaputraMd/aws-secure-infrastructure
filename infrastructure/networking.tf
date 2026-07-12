@@ -160,10 +160,6 @@ resource "aws_vpc_endpoint" "ssm" {
   }
 }
 
-# =============================================
-# Security Groups
-# =============================================
-
 # Security Group — VPC Endpoints
 resource "aws_security_group" "vpc_endpoints" {
   name        = "${var.project_name}-${var.environment}-vpc-endpoints-sg"
@@ -298,24 +294,17 @@ resource "aws_vpc_security_group_ingress_rule" "rds_postgresql" {
   referenced_security_group_id = aws_security_group.ecs.id
 }
 
-# =============================================
 # VPC Flow Logs 
-# =============================================
-
 resource "aws_flow_log" "vpc" {
-  iam_role_arn         = aws_iam_role.flow_logs_role.arn
-  log_destination      = aws_cloudwatch_log_group.vpc.arn
-  log_destination_type = "cloud-watch-logs"
+  log_destination      = "${aws_s3_bucket.security_logs.arn}/flow-logs"
+  log_destination_type = "s3"
   traffic_type         = "ALL"
   vpc_id               = aws_vpc.main.id
-}
-
-# CloudWatch Log Group — stores vpc logs 
-resource "aws_cloudwatch_log_group" "vpc" {
-  name              = "/vpc/${var.project_name}-${var.environment}"
-  retention_in_days = 30
 
   tags = {
-    Name = "${var.project_name}-${var.environment}-vpc-logs"
+    Name               = "${var.project_name}-${var.environment}-flow-logs"
+    DataClassification = "Restricted"
   }
 }
+
+
