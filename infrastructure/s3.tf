@@ -81,13 +81,7 @@ resource "aws_s3_bucket_public_access_block" "mattermost_files" {
   restrict_public_buckets = true
 }
 
-#------------------------------------------------------------------------------
 # Lifecycle Configuration
-# Old version will expire after 180 days
-# Timeline:
-#   Day  0  → STANDARD        (hot, immediately accessible)
-#   Day 90  → Intelligent Tiering  - not accessed file
-# ------------------------------------------------------------------------------
 resource "aws_s3_bucket_intelligent_tiering_configuration" "mattermost_files" {
   bucket = aws_s3_bucket.mattermost_files.id
   name   = "MattermostFiles"
@@ -100,7 +94,7 @@ resource "aws_s3_bucket_intelligent_tiering_configuration" "mattermost_files" {
   }
 }
 
-
+# version-expiration lifecycle (Old version will expire after 180 days)
 resource "aws_s3_bucket_lifecycle_configuration" "mattermost_files_versions" {
   depends_on = [aws_s3_bucket_versioning.mattermost-files]
   bucket     = aws_s3_bucket.mattermost_files.id
@@ -395,16 +389,7 @@ resource "aws_s3_bucket_policy" "security_logs_policy" {
 }
 
 
-# ------------------------------------------------------------------------------
 # Lifecycle Configuration
-# Transitions logs through cheaper storage tiers as they age.
-#
-# Timeline:
-#   Day  0  → STANDARD        (hot, immediately accessible)
-#   Day 30  → STANDARD_IA     (infrequent access, same latency)
-#   Day 90  → GLACIER_IR      (instant retrieval, ~60% cheaper than IA)
-#   Day 365 → DEEP_ARCHIVE    (bulk retrieval 12h, ~80% cheaper than Glacier IR)
-# ------------------------------------------------------------------------------
 resource "aws_s3_bucket_lifecycle_configuration" "security_logs" {
   depends_on = [aws_s3_bucket_versioning.security_logs]
   bucket     = aws_s3_bucket.security_logs.id
@@ -412,9 +397,68 @@ resource "aws_s3_bucket_lifecycle_configuration" "security_logs" {
   rule {
     id     = "cloudtrail-log-tiering"
     status = "Enabled"
+    expiration {
+      days = 395
+    }
 
     filter {
-      prefix = "cloudtrail/management-events"
+      prefix = "cloudtrail/"
+    }
+
+    transition {
+      days          = 30
+      storage_class = "STANDARD_IA"
+    }
+
+    transition {
+      days          = 90
+      storage_class = "GLACIER_IR"
+    }
+
+    transition {
+      days          = 365
+      storage_class = "DEEP_ARCHIVE"
+    }
+
+  }
+
+  rule {
+    id     = "config-tiering"
+    status = "Enabled"
+    expiration {
+      days = 395
+    }
+
+    filter {
+      prefix = "config"
+    }
+
+    transition {
+      days          = 30
+      storage_class = "STANDARD_IA"
+    }
+
+    transition {
+      days          = 90
+      storage_class = "GLACIER_IR"
+    }
+
+    transition {
+      days          = 365
+      storage_class = "DEEP_ARCHIVE"
+    }
+
+  }
+
+  rule {
+    id     = "flow-logs-tiering"
+    status = "Enabled"
+    expiration {
+      days = 395
+    }
+
+    filter {
+      prefix = "flow-logs/"
     }
 
     transition {
