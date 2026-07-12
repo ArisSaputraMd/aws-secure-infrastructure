@@ -389,7 +389,7 @@ resource "aws_s3_bucket_policy" "security_logs_policy" {
 }
 
 
-# Lifecycle Configuration
+# Lifecycle Configuration (auto delete, 30 days after compliance mode expire for operational buffer like audit etc.)
 resource "aws_s3_bucket_lifecycle_configuration" "security_logs" {
   depends_on = [aws_s3_bucket_versioning.security_logs]
   bucket     = aws_s3_bucket.security_logs.id
@@ -414,12 +414,6 @@ resource "aws_s3_bucket_lifecycle_configuration" "security_logs" {
       days          = 90
       storage_class = "GLACIER_IR"
     }
-
-    transition {
-      days          = 365
-      storage_class = "DEEP_ARCHIVE"
-    }
-
   }
 
   rule {
@@ -442,12 +436,6 @@ resource "aws_s3_bucket_lifecycle_configuration" "security_logs" {
       days          = 90
       storage_class = "GLACIER_IR"
     }
-
-    transition {
-      days          = 365
-      storage_class = "DEEP_ARCHIVE"
-    }
-
   }
 
   rule {
@@ -470,12 +458,6 @@ resource "aws_s3_bucket_lifecycle_configuration" "security_logs" {
       days          = 90
       storage_class = "GLACIER_IR"
     }
-
-    transition {
-      days          = 365
-      storage_class = "DEEP_ARCHIVE"
-    }
-
   }
 }
 
