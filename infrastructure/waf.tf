@@ -7,6 +7,7 @@
 # manage the Web ACL's rules outside of this resource's direct management.
 # =============================================
 
+
 resource "aws_wafv2_web_acl" "web_acl" {
   name  = "${var.project_name}-${var.environment}-web-acl"
   scope = "REGIONAL"
@@ -234,10 +235,56 @@ resource "aws_wafv2_web_acl_association" "alb_association" {
   web_acl_arn  = aws_wafv2_web_acl.web_acl.arn
 }
 
-# Configure WAF logging to an S3 bucket
+# stores WAF BLOCK/COUNT actions only. (ALLOW dropped by logging_filter)
+resource "aws_cloudwatch_log_group" "waf_logs" {
+  name              = "aws-waf-logs-blocked-logs"
+  retention_in_days = 30
+
+  tags = {
+    Name               = "${var.project_name}-${var.environment}-waf-logs"
+    DataClassification = "internal"
+  }
+}
+
+resource "aws_cloudwatch_log_resource_policy" "waf_logs" {
+  policy_document = data.aws_iam_policy_document.cw_log_waf.json
+  policy_name     = "${var.project_name}-${var.environment}-cw-webacl-policy"
+}
+
+data "aws_iam_policy_document" "cw_log_waf" {
+  statement {
+    sid    = "AWSWafv2Write"
+    effect = "Allow"
+
+    principals {
+      type        = "Service"
+      identifiers = ["delivery.logs.amazonaws.com"]
+    }
+
+    actions = [
+      "logs:CreateLogStream",
+      "logs:PutLogEvents"
+    ]
+    resources = ["${aws_cloudwatch_log_group.waf_logs.arn}:*"]
+    condition {
+      test     = "ArnLike"
+      values   = ["arn:aws:logs:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:*"]
+      variable = "aws:SourceArn"
+    }
+    condition {
+      test     = "StringEquals"
+      values   = [tostring(data.aws_caller_identity.current.account_id)]
+      variable = "aws:SourceAccount"
+    }
+  }
+}
+
+# Configure WAF logging to cloudwatch logs group
 resource "aws_wafv2_web_acl_logging_configuration" "waf_logging" {
-  log_destination_configs = [aws_s3_bucket.security_logs.arn]
+  log_destination_configs = [aws_cloudwatch_log_group.waf_logs.arn]
   resource_arn            = aws_wafv2_web_acl.web_acl.arn
+
+  depends_on = [aws_cloudwatch_log_resource_policy.waf_logs]
 
   logging_filter {
     default_behavior = "DROP"

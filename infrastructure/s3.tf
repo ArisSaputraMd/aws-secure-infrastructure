@@ -332,32 +332,6 @@ data "aws_iam_policy_document" "security_logs_policy" {
     }
   }
 
-  # WAFv2 write permission
-  statement {
-    sid    = "AWSWAFv2Write"
-    effect = "Allow"
-    principals {
-      type        = "Service"
-      identifiers = ["delivery.logs.amazonaws.com"]
-    }
-    actions = [
-      "s3:PutObject"
-    ]
-    resources = ["${aws_s3_bucket.security_logs.arn}/wafv2/AWSLogs/${data.aws_caller_identity.current.account_id}/*"]
-
-    condition {
-      test     = "StringEquals"
-      variable = "s3:x-amz-acl"
-      values   = ["bucket-owner-full-control"]
-    }
-    condition {
-      test     = "StringEquals"
-      variable = "aws:SourceAccount"
-      values   = [data.aws_caller_identity.current.account_id]
-    }
-  }
-
-
   # - VPC Flow logs permission
   statement {
     sid    = "AWSFlowLogsAclCheck"
@@ -460,5 +434,4 @@ resource "aws_s3_bucket_lifecycle_configuration" "security_logs" {
 
   }
 }
-
 
