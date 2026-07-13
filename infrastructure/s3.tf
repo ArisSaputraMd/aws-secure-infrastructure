@@ -192,7 +192,8 @@ data "aws_region" "current" {}
 
 # construct arn to prevent cycle dependency
 locals {
-  cloudtrail_arn = "arn:aws:cloudtrail:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:trail/${var.project_name}-${var.environment}-cloudtrail"
+  management_trail_arn = "arn:aws:cloudtrail:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:trail/${var.project_name}-${var.environment}-cloudtrail-management-event"
+  data_trail_arn       = "arn:aws:cloudtrail:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:trail/${var.project_name}-${var.environment}-cloudtrail-data-event"
 }
 
 locals {
@@ -224,7 +225,7 @@ data "aws_iam_policy_document" "security_logs_policy" {
     }
   }
 
-  # CloudTrail Read (pre-flight check before delivery) and Write Permissions (log delivery)
+  # CloudTrail Read (pre-flight check before delivery)
   statement {
     sid    = "AWSCloudTrailAclCheck"
     effect = "Allow"
@@ -240,7 +241,7 @@ data "aws_iam_policy_document" "security_logs_policy" {
     condition {
       test     = "StringEquals"
       variable = "aws:SourceArn"
-      values   = [local.cloudtrail_arn]
+      values   = [local.management_trail_arn, local.data_trail_arn]
     }
     condition {
       test     = "StringEquals"
@@ -249,7 +250,7 @@ data "aws_iam_policy_document" "security_logs_policy" {
     }
   }
 
-  # CloudTrail Write Permissions (log delivery)
+  # CloudTrail management event Write Permissions (log delivery)
   statement {
     sid    = "AWSCloudTrailWrite"
     effect = "Allow"
@@ -270,7 +271,39 @@ data "aws_iam_policy_document" "security_logs_policy" {
     condition {
       test     = "StringEquals"
       variable = "aws:SourceArn"
-      values   = [local.cloudtrail_arn]
+      values   = [local.management_trail_arn]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [data.aws_caller_identity.current.account_id]
+    }
+  }
+
+
+  # CloudTrail data event Write Permissions
+  statement {
+    sid    = "AWSCloudTrailDataWrite"
+    effect = "Allow"
+
+    principals {
+      type        = "Service"
+      identifiers = ["cloudtrail.amazonaws.com"]
+    }
+
+    actions   = ["s3:PutObject"]
+    resources = ["${aws_s3_bucket.security_logs.arn}/cloudtrail/data-events/mattermost-files/AWSLogs/${data.aws_caller_identity.current.account_id}/*"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "s3:x-amz-acl"
+      values   = ["bucket-owner-full-control"]
+    }
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceArn"
+      values   = [local.data_trail_arn]
     }
 
     condition {
