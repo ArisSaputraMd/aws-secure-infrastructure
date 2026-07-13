@@ -10,6 +10,14 @@ resource "aws_lb" "application_load_balancer" {
   security_groups    = [aws_security_group.alb.id]
   subnets            = aws_subnet.public[*].id
 
+  # access log enabled
+  access_logs {
+    bucket  = aws_s3_bucket.elb_logs.id
+    prefix  = "elb/alb-accesslogs"
+    enabled = true
+
+  }
+
   tags = {
     Name = "${var.project_name}-${var.environment}-alb"
   }

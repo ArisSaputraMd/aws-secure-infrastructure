@@ -371,7 +371,7 @@ data "aws_iam_policy_document" "security_logs_policy" {
     }
     condition {
       test     = "ArnLike"
-      variable = "aws:SourceAccount"
+      variable = "aws:SourceArn"
       values   = [local.flow_logs_arn]
     }
     condition {
@@ -461,3 +461,152 @@ resource "aws_s3_bucket_lifecycle_configuration" "security_logs" {
   }
 }
 
+# ==============================================================================
+# ELB Access Logs bucket - SSE-S3
+# - force_destroy is controlled via a variable. In production, this must be false to prevent Terraform from deleting
+#   non-empty S3 buckets and their contents during destroy operations.
+# - Object lock and retention are controled via variable, dev env are set to false as default.
+# ==============================================================================
+resource "aws_s3_bucket" "elb_logs" {
+  bucket              = "${var.project_name}-${var.environment}-elb-logs"
+  force_destroy       = var.logs_bucket_force_destroy
+  object_lock_enabled = var.logs_bucket_object_lock
+
+  tags = {
+    Name               = "${var.project_name}-${var.environment}-elb-logs"
+    DataClassification = "Restricted"
+  }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "elb_logs" {
+  bucket = aws_s3_bucket.elb_logs.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
+}
+
+# Versioning - Required for object lock and state visibility.
+resource "aws_s3_bucket_versioning" "elb_logs" {
+  depends_on = [aws_s3_bucket.elb_logs]
+  bucket     = aws_s3_bucket.elb_logs.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+# Block public access
+resource "aws_s3_bucket_public_access_block" "elb_logs" {
+  bucket = aws_s3_bucket.elb_logs.id
+
+  block_public_acls       = true
+  ignore_public_acls      = true
+  block_public_policy     = true
+  restrict_public_buckets = true
+}
+
+# Object Lock for prod env — set logs_bucket_object_lock = true in .tfvars to enable it
+resource "aws_s3_bucket_object_lock_configuration" "elb_logs" {
+  count      = var.logs_bucket_object_lock ? 1 : 0
+  depends_on = [aws_s3_bucket_versioning.elb_logs]
+  bucket     = aws_s3_bucket.elb_logs.id
+
+  rule {
+    default_retention {
+      mode = "COMPLIANCE"
+      days = var.bucket_compliance_days
+    }
+  }
+}
+
+locals {
+  elb_logs_arn = "arn:aws:elasticloadbalancing:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:loadbalancer/*"
+}
+
+data "aws_iam_policy_document" "elb_logs_policy" {
+  # Deny insecure transport (http) to S3 bucket
+  statement {
+    sid    = "DenyInsecureTransport"
+    effect = "Deny"
+
+    principals {
+      type        = "*"
+      identifiers = ["*"]
+    }
+
+    actions = ["s3:*"]
+
+    resources = [
+      aws_s3_bucket.elb_logs.arn,
+      "${aws_s3_bucket.elb_logs.arn}/*"
+    ]
+
+    condition {
+      test     = "Bool"
+      variable = "aws:SecureTransport"
+      values   = ["false"]
+    }
+  }
+
+  # ALB access logs write permission
+  statement {
+    sid    = "AWSAlbLogsWrite"
+    effect = "Allow"
+    principals {
+      type        = "Service"
+      identifiers = ["logdelivery.elasticloadbalancing.amazonaws.com"]
+    }
+    actions = [
+      "s3:PutObject"
+    ]
+    resources = ["${aws_s3_bucket.elb_logs.arn}/elb/alb-accesslogs/AWSLogs/${data.aws_caller_identity.current.account_id}/*"]
+
+    condition {
+      test     = "ArnLike"
+      variable = "aws:SourceArn"
+      values   = [local.elb_logs_arn]
+    }
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [data.aws_caller_identity.current.account_id]
+    }
+  }
+}
+
+resource "aws_s3_bucket_policy" "elb_logs_policy" {
+  depends_on = [data.aws_iam_policy_document.elb_logs_policy]
+  bucket     = aws_s3_bucket.elb_logs.id
+  policy     = data.aws_iam_policy_document.elb_logs_policy.json
+}
+
+
+# Lifecycle Configuration (auto delete, 30 days after compliance mode expire for operational buffer like audit etc.)
+resource "aws_s3_bucket_lifecycle_configuration" "elb_logs" {
+  depends_on = [aws_s3_bucket_versioning.elb_logs]
+  bucket     = aws_s3_bucket.elb_logs.id
+
+  rule {
+    id     = "alb-access-log-tiering"
+    status = "Enabled"
+    expiration {
+      days = 395
+    }
+
+    filter {
+      prefix = "elb/alb-accesslogs"
+    }
+
+    transition {
+      days          = 30
+      storage_class = "STANDARD_IA"
+    }
+
+    transition {
+      days          = 90
+      storage_class = "GLACIER_IR"
+    }
+  }
+}
