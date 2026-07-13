@@ -340,7 +340,7 @@ data "aws_iam_policy_document" "security_logs_policy" {
 
     principals {
       type        = "Service"
-      identifiers = ["delivery.amazonaws.com"]
+      identifiers = ["config.amazonaws.com"]
     }
 
     actions   = ["s3:PutObject"]

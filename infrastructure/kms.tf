@@ -122,6 +122,17 @@ data "aws_iam_policy_document" "kms_policy" {
   # CloudTrail: only the actions actually needed for log delivery.
   # EncryptionContext condition scopes this to CloudTrail ARNs in this account only 
   statement {
+    sid    = "EnableCloudTrailDescribeKey"
+    effect = "Allow"
+    principals {
+      type        = "Service"
+      identifiers = ["cloudtrail.amazonaws.com"]
+    }
+    actions   = ["kms:DescribeKey"]
+    resources = ["*"]
+  }
+
+  statement {
     sid    = "EnableCloudTrailPermissions"
     effect = "Allow"
     principals {
@@ -137,6 +148,11 @@ data "aws_iam_policy_document" "kms_policy" {
       test     = "StringLike"
       variable = "kms:EncryptionContext:aws:cloudtrail:arn"
       values   = ["arn:aws:cloudtrail:*:${data.aws_caller_identity.current.account_id}:trail/*"]
+    }
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceArn"
+      values   = [local.management_trail_arn, local.data_trail_arn]
     }
   }
 
@@ -166,11 +182,12 @@ data "aws_iam_policy_document" "kms_policy" {
     effect = "Allow"
     principals {
       type        = "Service"
-      identifiers = ["flow-logs.amazonaws.com"]
+      identifiers = ["delivery.logs.amazonaws.com"]
     }
     actions = [
       "kms:GenerateDataKey*",
       "kms:Decrypt",
+      "kms:DescribeKey",
     ]
     resources = ["*"]
     condition {
