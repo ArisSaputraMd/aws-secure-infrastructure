@@ -47,7 +47,7 @@ resource "aws_ecs_task_definition" "mattermost" {
   container_definitions = jsonencode([
     {
       name      = "mattermost"
-      image     = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/mattermost/mattermost-team-edition:11.9.0"
+      image     = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/${var.project_name}-${var.environment}-mattermost:11.9.0"
       essential = true
 
       portMappings = [

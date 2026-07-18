@@ -301,6 +301,15 @@ resource "aws_flow_log" "vpc" {
   traffic_type         = "ALL"
   vpc_id               = aws_vpc.main.id
 
+  log_format = "$${version} $${account-id} $${interface-id} $${srcaddr} $${dstaddr} $${srcport} $${dstport} $${protocol} $${packets} $${bytes} $${start} $${end} $${action} $${log-status} $${vpc-id} $${subnet-id} $${instance-id} $${tcp-flags} $${type} $${pkt-srcaddr} $${pkt-dstaddr} $${flow-direction} $${traffic-path}"
+
+
+  destination_options {
+    file_format                = "parquet"
+    per_hour_partition         = true
+    hive_compatible_partitions = true
+  }
+
   tags = {
     Name               = "${var.project_name}-${var.environment}-flow-logs"
     DataClassification = "Restricted"

@@ -25,7 +25,7 @@ resource "aws_cloudtrail" "data_event" {
   kms_key_id     = aws_kms_key.security_logs.arn
 
   include_global_service_events = false
-  is_multi_region_trail         = true
+  is_multi_region_trail         = false
   enable_log_file_validation    = true
   event_selector {
     read_write_type           = "All"
